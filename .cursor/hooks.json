@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "node .claude/hooks/protect-core.mjs"
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Lead } from "../core/types.js";
-import sheetsAppend from "./sheets-append.js";
+import { sheetsAppend } from "./sheets-append.js";
 
 const lead: Lead = {
   id: "ld_0002",
@@ -40,5 +40,17 @@ describe("sheets-append", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"status":"quota_exceeded"}', { status: 200 })));
 
     await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: false, error: "sheets error: quota_exceeded" });
+  });
+
+  it("не надсилає токен, якщо адреса вебхука не https", async () => {
+    vi.stubEnv("SHEETS_WEBHOOK_URL", "http://sheets.example.test/append");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sheetsAppend.send(lead)).resolves.toEqual({
+      ok: false,
+      error: "sheets-append: SHEETS_WEBHOOK_URL must use https",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
