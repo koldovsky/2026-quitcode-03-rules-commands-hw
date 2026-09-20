@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Lead } from "../core/types.js";
-import sheetsAppend from "./sheets-append.js";
+import { sheetsAppend } from "./sheets-append.js";
 
 const lead: Lead = {
   id: "ld_0002",
