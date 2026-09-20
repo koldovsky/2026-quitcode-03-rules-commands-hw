@@ -91,5 +91,22 @@ for (const c of ["analyze-error", "refactor", "generate-integration"]) {
     /^description:/m.test(s) && /## Acceptance criteria/.test(s) && /## Stop/.test(s));
 }
 
+// 11. Другий A/B на Opus: артефакти на місці й числа збігаються з транскриптами
+for (const f of ["transcript-opus-a.md", "transcript-opus-b.md", "opus-a.diff", "opus-b.diff"]) {
+  check(`docs/ab/${f} існує і не порожній`,
+    existsSync(`${REPO}/docs/ab/${f}`) && readFileSync(`${REPO}/docs/ab/${f}`, "utf8").length > 100);
+}
+for (const [arm, calls] of [["a", 9], ["b", 13]]) {
+  const t = readFileSync(`${REPO}/docs/ab/transcript-opus-${arm}.md`, "utf8");
+  const m = t.match(/викликів інструментів: (\d+)/);
+  check(`transcript-opus-${arm}: ${m[1]} викликів у ході 1`, Number(m[1]) === calls);
+  check(`ab-validation цитує це число для Opus ${arm.toUpperCase()}`, ab.includes(`| ${calls} |`));
+}
+check("ab-validation не заявляє різниці в захисті ядра на Opus",
+  ab.includes("Різниця в захисті ядра | **є** | **немає** |"));
+
+// 12. Контроль ізоляції існує і сам себе перевіряє
+check("tools/ab-isolate.mjs існує", existsSync(`${REPO}/tools/ab-isolate.mjs`));
+
 console.log(fails === 0 ? "\nАУДИТ ПРОЙДЕНО: розбіжностей немає." : `\nАУДИТ: ${fails} розбіжностей.`);
 process.exit(fails === 0 ? 0 : 1);

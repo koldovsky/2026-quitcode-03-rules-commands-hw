@@ -1,0 +1,114 @@
+diff --git a/app/src/integrations/sheets-append.test.ts b/app/src/integrations/sheets-append.test.ts
+index 7549568..9bc8a80 100644
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -10,10 +10,20 @@ const lead: Lead = {
+   createdAt: "2026-09-10T09:30:00.000Z",
+ };
+ 
++/** Кампанія ще не описана в Lead (core міняється окремим PR) — у тестах додаємо її так само, як це робить форма. */
++const withCampaign = (campaign: unknown): Lead => ({ ...lead, utmCampaign: campaign }) as Lead;
++
++const rowOf = (fetchMock: { mock: { calls: [string, RequestInit?][] } }): unknown => {
++  const [, init] = fetchMock.mock.calls[0]!;
++  return JSON.parse(String(init?.body));
++};
++
++let logSpy: ReturnType<typeof vi.spyOn>;
++
+ beforeEach(() => {
+   vi.stubEnv("SHEETS_WEBHOOK_URL", "https://sheets.example.test/append");
+   vi.stubEnv("SHEETS_TOKEN", "fake-sheets-token-0000");
+-  vi.spyOn(console, "log").mockImplementation(() => {});
++  logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+ });
+ 
+ afterEach(() => {
+@@ -32,10 +42,43 @@ describe("sheets-append", () => {
+     const [url, init] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+     expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
++    });
++  });
++
++  it("пише кампанію останньою колонкою рядка", async () => {
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send(withCampaign("spring_sale_2026"))).resolves.toEqual({ ok: true, value: undefined });
++
++    expect(rowOf(fetchMock)).toEqual({
++      values: [
++        ["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", "spring_sale_2026"],
++      ],
+     });
+   });
+ 
++  it("лишає колонку порожньою і попереджає, якщо форма передала не рядок", async () => {
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send(withCampaign(42))).resolves.toEqual({ ok: true, value: undefined });
++
++    expect(rowOf(fetchMock)).toEqual({
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
++    });
++    expect(logSpy.mock.calls.map(String).join("\n")).toContain("non-string utmCampaign (number)");
++  });
++
++  it("не попереджає, коли кампанії просто немає", async () => {
++    vi.stubGlobal("fetch", vi.fn(async () => new Response('{"status":"ok"}', { status: 200 })));
++
++    await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: true, value: undefined });
++
++    expect(logSpy.mock.calls.map(String).join("\n")).not.toContain("utmCampaign");
++  });
++
+   it("повертає помилку, якщо таблиця відповіла не ok", async () => {
+     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"status":"quota_exceeded"}', { status: 200 })));
+ 
+diff --git a/app/src/integrations/sheets-append.ts b/app/src/integrations/sheets-append.ts
+index 063cdb7..8002661 100644
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -12,6 +12,29 @@ interface SheetsResponse {
+ const isSheetsResponse: Guard<SheetsResponse> = (value): value is SheetsResponse =>
+   isRecord(value) && isString(value.status);
+ 
++/**
++ * Кампанія (`utmCampaign`) приходить із форми сайту, але в `Lead` із core/types.ts її поки немає:
++ * core міняється окремим PR платформної команди (див. docs/core-change-request.md).
++ * Доти читаємо поле як необов'язкове розширення ліда — `unknown` плюс guard, без довіри до форми.
++ */
++type LeadWithCampaign = Lead & { utmCampaign?: unknown };
++
++/**
++ * Кампанія для колонки таблиці. Відсутня — порожня комірка, це штатний випадок.
++ * Присутня, але не рядок — теж порожня комірка, проте з попередженням: зіпсоване поле форми
++ * має бути видно в журналі. Зупиняти через нього доставку ліда не варто — кампанія це
++ * атрибуція, а не дані обліку, і через неї не має зупинятись уся синхронізація.
++ * Значення в журнал не пишемо, лише тип: у ньому може бути що завгодно.
++ */
++const campaignOf = (lead: Lead): string => {
++  const value = (lead as LeadWithCampaign).utmCampaign;
++  if (isString(value)) return value;
++  if (value !== undefined) {
++    log.warn(`sheets-append: lead ${lead.id} has non-string utmCampaign (${typeof value}), writing empty cell`);
++  }
++  return "";
++};
++
+ export const sheetsAppend: Integration = {
+   name: "sheets-append",
+   requiredEnv: ["SHEETS_WEBHOOK_URL", "SHEETS_TOKEN"],
+@@ -24,7 +47,7 @@ export const sheetsAppend: Integration = {
+ 
+     const url = webhookUrl.value + "?token=" + token.value;
+     const response = await postJson(url, {
+-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
++      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, campaignOf(lead)]],
+     });
+     if (!response.ok) return response;
+ 
