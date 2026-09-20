@@ -6,7 +6,7 @@
 ## Базова лінія проєкту
 
 ```
-npm --prefix app test            →  Test Files 8 passed (8), Tests 38 passed (38)
+npm --prefix app test            →  Test Files 8 passed (8), Tests 39 passed (39)
 npm --prefix app run typecheck   →  без помилок
 npm --prefix app run check:rules →  TOTAL: 0 violation(s), core-untouched 0
 node .claude/hooks/protect-core.test.mjs → 32/32 перевірок пройдено

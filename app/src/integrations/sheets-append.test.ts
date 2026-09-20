@@ -36,6 +36,21 @@ describe("sheets-append", () => {
     });
   });
 
+  // Третій випадок, якого вимагає architecture.md для кожної інтеграції. До
+  // рефакторингу цей шлях був невизначеним: стара реалізація йшла в мережу на
+  // URL «undefined?token=undefined» замість того, щоб повернути помилку.
+  it("повертає помилку, якщо не задано SHEETS_TOKEN, і не йде в мережу", async () => {
+    vi.stubEnv("SHEETS_TOKEN", "");
+    const fetchMock = vi.fn(async () => new Response('{"status":"ok"}', { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sheetsAppend.send(lead)).resolves.toEqual({
+      ok: false,
+      error: "missing environment variable SHEETS_TOKEN",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("повертає помилку, якщо таблиця відповіла не ok", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"status":"quota_exceeded"}', { status: 200 })));
 
