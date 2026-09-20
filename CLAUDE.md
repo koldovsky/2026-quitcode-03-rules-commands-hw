@@ -1,3 +1,13 @@
 # CLAUDE.md
 
-See [AGENTS.md](./AGENTS.md) for project conventions.
+@AGENTS.md
+
+## Специфічне для Claude Code
+
+- Правила проєкту лежать у `.claude/rules/`. `do-not-touch.md` без frontmatter —
+  вантажиться на старті кожної сесії; `architecture.md` і `conventions.md` мають
+  `paths: app/src/**` і підтягуються, коли відповідний файл потрапляє в контекст.
+- Прив'язка по `paths` спрацьовує на інструмент **Read**. Файл, відкритий через
+  `cat` чи `head` у Bash, правил не підтягує — тому перед роботою над `app/src/**`
+  читай файли через Read, а не через шелл.
+- Перевірити, що база справді завантажилась: `/context` → розділ **Memory files**.
