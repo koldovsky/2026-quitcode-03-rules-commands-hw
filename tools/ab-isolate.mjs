@@ -13,7 +13,7 @@
 // Перші три спіймано в реальних прогонах, останні два — цим скриптом.
 //
 // Тому стенд B вважається дійсним, лише якщо жоден маркер моїх артефактів не
-// знайдено ні в робочій теці, ні в жодному комміті історії. Інакше скрипт
+// знайдено ні в робочій теці, ні в жодному коміті історії. Інакше скрипт
 // завершується з кодом 1 — прогін не запускається взагалі.
 //
 // Запуск із кореня репо:
@@ -80,7 +80,7 @@ function build(arm) {
   // але самі залежності не є частиною порівняння.
   const modules = join(repo, "app", "node_modules");
   if (existsSync(modules)) symlinkSync(modules, join(dir, "app", "node_modules"), "dir");
-  // Свіжа історія в один комміт: інакше `git show` відновить прибране.
+  // Свіжа історія в один коміт: інакше `git show` відновить прибране.
   git(["init", "-q"], dir);
   git(["add", "-A"], dir);
   git(["-c", "user.email=ab@example.test", "-c", "user.name=ab", "commit", "-q", "-m", "baseline"], dir);
@@ -97,7 +97,7 @@ function grepMarkers(dir) {
     } catch {
       /* grep=1 означає «не знайдено» */
     }
-    // Історія: усі об'єкти в усіх коммітах
+    // Історія: усі об'єкти в усіх комітах
     try {
       const revs = git(["rev-list", "--all"], dir).trim().split("\n").filter(Boolean);
       const out = git(["grep", "-I", "-l", marker, ...revs], dir);
@@ -116,7 +116,7 @@ function baseline(dir) {
   return `${tests} тестів, TOTAL ${total}`;
 }
 
-console.log(`Стенди з комміту ${git(["rev-parse", "--short", commit]).trim()} → ${resolve(outDir)}\n`);
+console.log(`Стенди з коміту ${git(["rev-parse", "--short", commit]).trim()} → ${resolve(outDir)}\n`);
 
 const dirA = build("a");
 const dirB = build("b");
@@ -132,10 +132,10 @@ for (const p of DROPPED) {
   check(`прибрано з обох: ${p}`, !existsSync(join(dirA, p)) && !existsSync(join(dirB, p)));
 }
 
-// 3. Історія — рівно один комміт у кожному
+// 3. Історія — рівно один коміт у кожному
 for (const [arm, dir] of [["A", dirA], ["B", dirB]]) {
   const n = git(["rev-list", "--all"], dir).trim().split("\n").filter(Boolean).length;
-  check(`${arm}: історія в один комміт`, n === 1, `${n}`);
+  check(`${arm}: історія в один коміт`, n === 1, `${n}`);
 }
 
 // 4. ГОЛОВНЕ: у B недосяжні жодні маркери — ні на диску, ні в історії
