@@ -6,12 +6,12 @@
 // пише причину в stderr і виходить з кодом 2 (Claude Code блокує виклик
 // і повертає stderr моделі).
 //
-// Покриття навмисно ширше за Edit|Write: інструмент Bash дозволяє обійти
-// файловий хук через `sed -i`, `tee`, `> file`. Для Bash використано евристику
-// «захищений шлях + ознака запису»: повний розбір shell тут неможливий.
-// Читання (`cat`, `grep`, `rg`) НЕ блокується — воно дозволене й потрібне,
-// напр. команді /analyze-error для materials/error-log.txt.
-// Точні межі покриття, зокрема відомі обходи, — у docs/verification.md.
+// Покриття ширше за Edit|Write, бо Bash дозволяє обійти файловий хук
+// (`sed -i`, `tee`, `> file`). Повний розбір shell тут неможливий, тому для
+// Bash застосовано принцип «перевіряй ціль запису, а не згадку шляху»:
+// команда ріжеться на сегменти по ; && || |, і в кожному перевіряються саме
+// аргументи операцій запису. Читання (cat, grep, shasum) не блокується.
+// Відомі межі покриття — у docs/verification.md, розділ Task E.
 import { relative, resolve, sep } from "node:path";
 
 /** Шляхи відносно кореня репо. Джерело: materials/architecture-brief.md. */
@@ -20,34 +20,112 @@ const PROTECTED = ["app/src/core", "app/scripts", "materials", ".coderabbit.yaml
 /** Перезаписує еталонні хеші core — ховає порушення, не торкаючись захищеного файлу. */
 const WRITE_LOCK = /--write-lock/;
 
-/** Ознаки наміру записати: перенаправлення, редагування на місці, файлові операції. */
-const WRITE_INTENT =
-  /(^|[\s;&|(`])(rm|mv|cp|tee|truncate|dd|touch|mkdir|ln|chmod|chown|patch|install)\s|>>?[^>]|\bsed\b[^|]*\s-i|\bperl\b[^|]*\s-[a-zA-Z]*i|\bgit\s+(apply|checkout|restore|rm|mv)\b|\b(cat|printf|echo)\b[^|]*>/;
+/** Команди, що змінюють будь-який зі своїх файлових аргументів. */
+const MUTATING_ALL = new Set([
+  "rm", "mv", "tee", "truncate", "dd", "touch", "mkdir", "rmdir",
+  "chmod", "chown", "patch", "shred", "unlink",
+]);
+
+/** Команди, що пишуть лише в останній аргумент; решта — джерела, їх читати можна. */
+const MUTATING_DEST = new Set(["cp", "ln", "install", "rsync"]);
 
 const toPosix = (p) => p.split(sep).join("/");
+const unquote = (s) => s.replace(/^['"]|['"]$/g, "");
 
-/** Чи лежить шлях у захищеній зоні. Порівняння по сегментах, не по префіксу рядка. */
-export function protectedHit(filePath, projectDir) {
+/**
+ * Чи лежить шлях у захищеній зоні. Порівняння по сегментах, не по префіксу рядка.
+ * `base` — від чого рахувати відносний шлях (для Bash це поточна тека команди,
+ * яка може відрізнятись від кореня репо через `cd`).
+ */
+export function protectedHit(filePath, projectDir, base = projectDir) {
   if (typeof filePath !== "string" || filePath.trim() === "") return null;
-  const rel = toPosix(relative(projectDir, resolve(projectDir, filePath)));
+  const clean = unquote(filePath.trim());
+  if (clean === "" || clean.startsWith("-")) return null;
+  let rel;
+  try {
+    rel = toPosix(relative(projectDir, resolve(base, clean)));
+  } catch {
+    return null;
+  }
   if (rel === "" || rel.startsWith("../")) return null; // поза репо — не наша зона
   return PROTECTED.find((p) => rel === p || rel.startsWith(p + "/")) ?? null;
 }
 
-/** Згадка захищеного шляху в рядку команди — незалежно від наміру. */
-function mentionsProtected(command) {
-  for (const p of PROTECTED) {
-    const escaped = p.replace(/[.]/g, "\\.");
-    if (new RegExp(`(^|[\\s"'=(\`])\\.?/?${escaped}([\\s"'/)\`]|$)`).test(command)) return p;
-  }
-  return null;
+/** Ріже команду на сегменти по роздільниках shell. */
+function segments(command) {
+  return command.split(/\n|;|&&|\|\||\||&/).map((s) => s.trim()).filter(Boolean);
 }
 
-export function protectedInCommand(command) {
+/** Розбиває сегмент на токени, зберігаючи лапки як одне ціле. */
+function tokenize(segment) {
+  return segment.match(/"[^"]*"|'[^']*'|\S+/g) ?? [];
+}
+
+/**
+ * Шукає в команді операції ЗАПИСУ, ціль яких — захищений шлях.
+ * Повертає зону або null. Згадка шляху сама по собі не блокує.
+ */
+export function protectedInCommand(command, projectDir, cwd = projectDir) {
   if (typeof command !== "string") return null;
   if (WRITE_LOCK.test(command)) return "app/scripts (--write-lock перезаписує core.lock.json)";
-  const zone = mentionsProtected(command);
-  if (zone && WRITE_INTENT.test(command)) return zone;
+
+  // Поточна тека може змінюватись усередині команди: `cd app && echo x > ...`
+  let base = cwd;
+
+  for (const segment of segments(command)) {
+    const tokens = tokenize(segment);
+    if (tokens.length === 0) continue;
+
+    const name = unquote(tokens[0]).split("/").pop();
+    const rest = tokens.slice(1);
+
+    // 0. Відстежуємо cd, щоб відносні шляхи далі рахувались правильно
+    if (name === "cd" && rest.length > 0) {
+      base = resolve(base, unquote(rest[0]));
+      continue;
+    }
+
+    // 1. Цілі перенаправлення: > файл, >> файл (і злитно: >файл)
+    for (const m of segment.matchAll(/>>?\s*("[^"]*"|'[^']*'|[^\s;&|<>]+)/g)) {
+      const zone = protectedHit(m[1], projectDir, base);
+      if (zone) return zone;
+    }
+
+    // 2. sed -i / perl -i: редагування на місці — усі файлові аргументи є цілями
+    if ((name === "sed" || name === "perl") && rest.some((t) => /^-[a-zA-Z]*i/.test(t))) {
+      for (const t of rest) {
+        const zone = protectedHit(t, projectDir, base);
+        if (zone) return zone;
+      }
+      continue;
+    }
+
+    // 3. git-підкоманди, що переписують робочу теку
+    if (name === "git" && ["apply", "checkout", "restore", "rm", "mv", "clean"].includes(unquote(rest[0] ?? ""))) {
+      for (const t of rest.slice(1)) {
+        const zone = protectedHit(t, projectDir, base);
+        if (zone) return zone;
+      }
+      continue;
+    }
+
+    // 4. Команди, що змінюють будь-який зі своїх аргументів
+    if (MUTATING_ALL.has(name)) {
+      for (const t of rest) {
+        const zone = protectedHit(t, projectDir, base);
+        if (zone) return zone;
+      }
+      continue;
+    }
+
+    // 5. Команди, що пишуть лише в останній аргумент (cp source dest)
+    if (MUTATING_DEST.has(name)) {
+      const args = rest.filter((t) => !t.startsWith("-"));
+      const dest = args[args.length - 1];
+      const zone = protectedHit(dest, projectDir, base);
+      if (zone) return zone;
+    }
+  }
   return null;
 }
 
@@ -67,8 +145,10 @@ export function decide(event, projectDir) {
   }
 
   if (tool === "Bash") {
-    const zone = protectedInCommand(input.command);
-    if (zone) return { block: true, reason: `Bash → ${String(input.command).slice(0, 200)}`, zone };
+    // cwd із події: команда могла бути запущена не з кореня репо
+    const cwd = typeof event?.cwd === "string" && event.cwd ? event.cwd : projectDir;
+    const zone = protectedInCommand(input.command, projectDir, cwd);
+    if (zone) return { block: true, reason: `Bash → ${String(input.command).slice(0, 160)}`, zone };
     return { block: false };
   }
 
