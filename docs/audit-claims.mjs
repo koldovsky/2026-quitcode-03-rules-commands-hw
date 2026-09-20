@@ -42,7 +42,7 @@ check("ab-validation фіксує базову лінію, що була НА М
 const hookOut = execSync("node .claude/hooks/protect-core.test.mjs 2>&1 | tail -1", { cwd: REPO, shell: "/bin/zsh" }).toString().trim();
 const nHook = Number(hookOut.match(/Усі (\d+)/)?.[1] ?? 0);
 check(`тести хука проходять: ${hookOut}`, hookOut.startsWith("Усі"));
-check(`кількість перевірок хука у звіті = ${nHook}`, ver.includes(`(${nHook} перевірки)`) || ver.includes(`${nHook} перевірок`));
+check(`кількість перевірок хука у звіті = ${nHook}`, ver.includes(`(${nHook} перевірки)`) || ver.includes(`(${nHook} перевірок)`) || ver.includes(`Усі ${nHook} перевірок`));
 
 // 4. Розмір скрипта хука
 const hookLines = readFileSync(`${REPO}/.claude/hooks/protect-core.mjs`, "utf8").split("\n").length - 1;

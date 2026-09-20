@@ -78,6 +78,14 @@ const cases = [
   ["cd падає, ; — shell у корені", BLOCK, bash(`cd missing ; echo x > ${CORE}`)],
   ["ланцюжок cd не губить корінь", BLOCK, bash(`cd app || cd /tmp || echo x > ${CORE}`)],
 
+  // --- регресії: динамічний cd (друге рев'ю CodeRabbit) ---
+  ["cd зі змінною → fail-closed", BLOCK, bash('cd "$PWD/app" && echo x > src/core/log.ts')],
+  ["cd з $(…) → fail-closed", BLOCK, bash("cd $(pwd)/app && echo x > src/core/log.ts")],
+  ["cd з `pwd` → fail-closed", BLOCK, bash("cd `pwd`/app && echo x > src/core/log.ts")],
+  ["cd з ~ → fail-closed", BLOCK, bash("cd ~/app && echo x > src/core/log.ts")],
+  ["динамічний cd + абсолютний /tmp — можна", ALLOW, bash("cd $HOME && echo y > /tmp/out.txt")],
+  ["динамічний cd без запису — можна", ALLOW, bash("cd $HOME && npm test")],
+
   // --- некоректний вхід: fail-closed ---
   ["stdin не JSON", BLOCK, "це не json"],
 

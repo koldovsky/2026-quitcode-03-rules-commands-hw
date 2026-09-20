@@ -76,7 +76,20 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
   // у `cd missing || echo x > …` він падає, і shell лишається де був.
   // Тому тримаємо НАБІР можливих тек і блокуємо, якщо ціль захищена хоч в одній.
   let bases = new Set([cwd]);
+  // Аргумент cd може бути динамічним ($VAR, `pwd`, $(…), ~, глоб) — його значення
+  // тут невідоме. Тоді будь-який ВІДНОСНИЙ запис далі може потрапити куди завгодно,
+  // зокрема в ядро, тож переходимо у fail-closed. Абсолютні шляхи лишаються
+  // обчислюваними, тож `cd $X && echo y > /tmp/z` і далі дозволено.
+  let baseUnknown = false;
+  const DYNAMIC = /[$`~*?]|\$\(/;
+
   const hitAny = (token) => {
+    if (baseUnknown && typeof token === "string") {
+      const clean = unquote(token.trim());
+      if (clean !== "" && !clean.startsWith("-") && !clean.startsWith("/")) {
+        return "невідома тека після динамічного cd (fail-closed)";
+      }
+    }
     for (const b of bases) {
       const zone = protectedHit(token, projectDir, b);
       if (zone) return zone;
@@ -94,6 +107,10 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
     // 0. cd: додаємо нову теку, стару НЕ прибираємо — cd міг не вдатися
     if (name === "cd" && rest.length > 0) {
       const target = unquote(rest[0]);
+      if (DYNAMIC.test(target)) {
+        baseUnknown = true;
+        continue;
+      }
       const next = new Set(bases);
       for (const b of bases) next.add(resolve(b, target));
       // обмежуємо зростання набору на довгих ланцюжках cd
