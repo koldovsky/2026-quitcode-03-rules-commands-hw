@@ -1,20 +1,52 @@
-// Перенесено з експорту n8n-воркфлоу «Leads → Google Sheets» (2024). Працює — не чіпали.
-export default {
+// Рядок у Google-таблиці на кожен лід. Перенесено з експорту n8n-воркфлоу
+// «Leads → Google Sheets» (2024), приведено до конвенцій без зміни поведінки:
+// той самий URL, те саме тіло запиту, ті самі тексти помилок.
+import { readEnv } from "../core/config.js";
+import { postJson } from "../core/http.js";
+import { log } from "../core/log.js";
+import { isRecord, parseJson } from "../core/parse.js";
+import type { Integration, Lead, Result } from "../core/types.js";
+
+const sheetsAppend: Integration = {
   name: "sheets-append",
   requiredEnv: ["SHEETS_WEBHOOK_URL", "SHEETS_TOKEN"],
 
-  async send(lead: any) {
-    const res = await fetch(process.env.SHEETS_WEBHOOK_URL + "?token=" + process.env.SHEETS_TOKEN, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]] }),
-    });
-    const data: any = JSON.parse(await res.text());
-    if (data.status !== "ok") {
-      console.log("sheets-append failed: " + res.url + " -> " + data.status);
-      return { ok: false as const, error: "sheets error: " + data.status };
+  async send(lead: Lead): Promise<Result<void>> {
+    const webhookUrl = readEnv("SHEETS_WEBHOOK_URL");
+    if (!webhookUrl.ok) return webhookUrl;
+
+    const token = readEnv("SHEETS_TOKEN");
+    if (!token.ok) return token;
+
+    const url = `${webhookUrl.value}?token=${token.value}`;
+    // retries: 0 — додавання рядка неідемпотентне. Стара реалізація робила рівно
+    // один fetch; дефолтні два повтори postJson дописували б дублікати щоразу,
+    // коли відповідь губиться або приходить 5xx уже після запису рядка.
+    const response = await postJson(
+      url,
+      { values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]] },
+      { retries: 0 },
+    );
+    if (!response.ok) {
+      log.error(`sheets-append: lead ${lead.id} not delivered: ${response.error}`);
+      return response;
     }
-    console.log("sheets-append: row added for lead " + lead.id);
-    return { ok: true as const, value: undefined };
+
+    const body = parseJson(response.value, isRecord, "sheets-append");
+    if (!body.ok) {
+      log.error(`sheets-append: lead ${lead.id} not delivered: ${body.error}`);
+      return body;
+    }
+
+    const status = body.value.status;
+    if (status !== "ok") {
+      log.error(`sheets-append failed: ${url} -> ${String(status)}`);
+      return { ok: false, error: `sheets error: ${String(status)}` };
+    }
+
+    log.info(`sheets-append: row added for lead ${lead.id}`);
+    return { ok: true, value: undefined };
   },
 };
+
+export default sheetsAppend;
