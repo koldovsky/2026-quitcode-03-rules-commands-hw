@@ -1,0 +1,110 @@
+diff --git a/app/src/integrations/sheets-append.test.ts b/app/src/integrations/sheets-append.test.ts
+index 12e42ce..814aac7 100644
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -1,6 +1,6 @@
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import type { Lead } from "../core/types.js";
+-import sheetsAppend from "./sheets-append.js";
++import sheetsAppend, { type LeadWithCampaign } from "./sheets-append.js";
+ 
+ const lead: Lead = {
+   id: "ld_0002",
+@@ -22,17 +22,48 @@ afterEach(() => {
+   vi.restoreAllMocks();
+ });
+ 
++const okFetch = () =>
++  vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++
++const rowOf = (fetchMock: ReturnType<typeof okFetch>): unknown => {
++  const [, init] = fetchMock.mock.calls[0]!;
++  return JSON.parse(String(init?.body));
++};
++
+ describe("sheets-append", () => {
+   it("додає рядок у таблицю і повертає ok", async () => {
+-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    const fetchMock = okFetch();
+     vi.stubGlobal("fetch", fetchMock);
+ 
+-    await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: true, value: undefined });
++    const withCampaign: LeadWithCampaign = { ...lead, utmCampaign: "spring_sale_2026" };
++    await expect(sheetsAppend.send(withCampaign)).resolves.toEqual({ ok: true, value: undefined });
+ 
+-    const [url, init] = fetchMock.mock.calls[0]!;
++    const [url] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+-    expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++    expect(rowOf(fetchMock)).toEqual({
++      values: [
++        [
++          "2026-09-10T09:30:00.000Z",
++          "Андрій Тестовий",
++          "andrii@studio-nova.example.test",
++          "",
++          "instagram",
++          "spring_sale_2026",
++        ],
++      ],
++    });
++  });
++
++  it("лишає колонку кампанії порожньою, якщо форма не передала utmCampaign", async () => {
++    const fetchMock = okFetch();
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: true, value: undefined });
++
++    expect(rowOf(fetchMock)).toEqual({
++      values: [
++        ["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""],
++      ],
+     });
+   });
+ 
+diff --git a/app/src/integrations/sheets-append.ts b/app/src/integrations/sheets-append.ts
+index 3f3e612..174f0b7 100644
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -1,12 +1,26 @@
+ // Рядок у Google-таблиці на кожен лід. Перенесено з експорту n8n-воркфлоу
+ // «Leads → Google Sheets» (2024), приведено до конвенцій без зміни поведінки:
+-// той самий URL, те саме тіло запиту, ті самі тексти помилок.
++// той самий URL, те саме тіло запиту, ті самі тексти помилок. Пізніше в кінець
++// рядка додалась колонка рекламної кампанії — на запит клієнта.
+ import { readEnv } from "../core/config.js";
+ import { postJson } from "../core/http.js";
+ import { log } from "../core/log.js";
+-import { isRecord, parseJson } from "../core/parse.js";
++import { isRecord, isString, parseJson } from "../core/parse.js";
+ import type { Integration, Lead, Result } from "../core/types.js";
+ 
++/**
++ * Лід із рекламною кампанією. Форма сайту передає `utmCampaign` (може бути
++ * відсутнім), але в `Lead` цього поля немає: `src/core/types.ts` — захищена зона
++ * (materials/architecture-brief.md), розширення контракту йде окремим PR
++ * платформної команди. До того часу поле живе тут, поруч зі своїм споживачем.
++ */
++export type LeadWithCampaign = Lead & { utmCampaign?: string };
++
++/** Кампанія ліда або порожня клітинка: поля може не бути, і це не помилка. */
++function campaignOf(lead: Lead): string {
++  return isRecord(lead) && isString(lead.utmCampaign) ? lead.utmCampaign : "";
++}
++
+ const sheetsAppend: Integration = {
+   name: "sheets-append",
+   requiredEnv: ["SHEETS_WEBHOOK_URL", "SHEETS_TOKEN"],
+@@ -20,7 +34,9 @@ const sheetsAppend: Integration = {
+ 
+     const url = `${webhookUrl.value}?token=${token.value}`;
+     const response = await postJson(url, {
+-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
++      values: [
++        [lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, campaignOf(lead)],
++      ],
+     });
+     if (!response.ok) {
+       log.error(`sheets-append: lead ${lead.id} not delivered: ${response.error}`);
