@@ -106,6 +106,8 @@ Claude Code з версії 2.1.277 читає `AGENTS.md` нативно — **
 
 ### `/analyze-error materials/error-log.txt`
 
+**Виклик:** `claude -p "/analyze-error materials/error-log.txt" --model sonnet --permission-mode acceptEdits`
+
 **Підстановка `$ARGUMENTS`:** так. Перевірено окремою тимчасовою командою
 (створена, запущена, видалена):
 
@@ -174,6 +176,8 @@ Claude Code з версії 2.1.277 читає `AGENTS.md` нативно — **
 
 ### `/refactor app/src/integrations/sheets-append.ts`
 
+**Виклик:** `claude -p "/refactor app/src/integrations/sheets-append.ts" --model sonnet --permission-mode bypassPermissions`
+
 **Перша спроба не дала нічого** — 23 с, жодної зміни, відповідь агента:
 
 > I'm blocked waiting on approval for these two commands (`npm test` and
@@ -214,6 +218,8 @@ Claude Code з версії 2.1.277 читає `AGENTS.md` нативно — **
 ```
 
 ### `/generate-integration telegram`
+
+**Виклик:** `claude -p "/generate-integration telegram" --model sonnet --permission-mode bypassPermissions`
 
 19 turns, 67 с. Створено **рівно три шляхи**, як вимагає архітектура:
 
