@@ -33,17 +33,17 @@ Node 22+, Vitest, нуль runtime-залежностей. Дані в репо�
 
 Повні формулювання — у `.claude/rules/`. Тут лише перелік, щоб нічого не загубилось:
 
-1. Захищені шляхи не редагуються, обхід прирівняний до прямої зміни → `do-not-touch.md`
-2. Помилки — це значення: `Result<T>` замість винятків → `conventions.md`
-3. HTTP лише через `postJson()`, змінні середовища лише через `readEnv()` → `conventions.md`
+1. Захищені шляхи не редагуються, обхід прирівняний до прямої зміни → [do-not-touch](.claude/rules/do-not-touch.md)
+2. Помилки — це значення: `Result<T>` замість винятків → [conventions](.claude/rules/conventions.md)
+3. HTTP лише через `postJson()`, змінні середовища лише через `readEnv()` → [conventions](.claude/rules/conventions.md)
 4. Будь-який JSON лише через `parseJson(text, guard)`; тихий фолбек на «значення за
-   замовчуванням» заборонений → `conventions.md`
-5. Журнал лише через `log` (маскує секрети); без `any`; без нових залежностей → `conventions.md`
-6. У сповіщення не передаються email і телефон ліда → `conventions.md`
-7. Нова інтеграція — це модуль, тест поруч і рядок у реєстрі, більше нічого → `architecture.md`
+   замовчуванням» заборонений → [conventions](.claude/rules/conventions.md)
+5. Журнал лише через `log` (маскує секрети); без `any`; без нових залежностей → [conventions](.claude/rules/conventions.md)
+6. У сповіщення не передаються email і телефон ліда → [conventions](.claude/rules/conventions.md)
+7. Нова інтеграція — це модуль, тест поруч і рядок у реєстрі, більше нічого → [architecture](.claude/rules/architecture.md)
 
 Задача, яку не зробити без зміни захищеної зони, тут не виконується: діє стоп-протокол
-з `do-not-touch.md` — зупинись і опиши, що саме потрібно змінити і навіщо.
+з [do-not-touch](.claude/rules/do-not-touch.md) — зупинись і опиши, що саме потрібно змінити і навіщо.
 
 ## Перед комітом
 
