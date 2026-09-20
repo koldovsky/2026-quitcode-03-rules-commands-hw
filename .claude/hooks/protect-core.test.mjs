@@ -89,6 +89,10 @@ const cases = [
   ["cd з * → fail-closed", BLOCK, bash("cd a* && echo x > src/core/log.ts")],
   ["cd зі static-шляхом і .. — блокує", BLOCK, bash("cd app/../app && echo x > src/core/log.ts")],
   ["cd за межі репо — не наша зона", ALLOW, bash("cd ../app && echo x > src/core/log.ts")],
+  ["cd -- app → запис у core блокується", BLOCK, bash("cd -- app && echo x > src/core/log.ts")],
+  ["cd -P app → fail-closed", BLOCK, bash("cd -P app && echo x > src/core/log.ts")],
+  ["cd -L app → fail-closed", BLOCK, bash("cd -L app && echo x > src/core/log.ts")],
+  ["cd без аргументу → fail-closed", BLOCK, bash("cd && echo x > src/core/log.ts")],
   ["динамічний cd + абсолютний /tmp — можна", ALLOW, bash("cd $HOME && echo y > /tmp/out.txt")],
   ["динамічний cd без запису — можна", ALLOW, bash("cd $HOME && npm test")],
 

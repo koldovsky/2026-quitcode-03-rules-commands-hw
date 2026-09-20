@@ -109,8 +109,24 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
     const rest = tokens.slice(1);
 
     // 0. cd: додаємо нову теку, стару НЕ прибираємо — cd міг не вдатися
-    if (name === "cd" && rest.length > 0) {
-      const target = unquote(rest[0]);
+    if (name === "cd") {
+      // Аргумент — не обов'язково rest[0]: `--` завершує обробку опцій
+      // (`cd -- app` переходить у app), а -P/-L змінюють семантику шляху.
+      // Розбирати їх повністю не варто: усе, крім `--`, робить базу невідомою.
+      let args = rest;
+      let optionSeen = false;
+      while (args.length > 0 && unquote(args[0]).startsWith("-")) {
+        const opt = unquote(args[0]);
+        args = args.slice(1);
+        if (opt === "--") break;
+        optionSeen = true;
+      }
+      if (optionSeen || args.length === 0) {
+        // -P/-L чи `cd` без аргументу (йде в $HOME) — куди саме, невідомо
+        baseUnknown = true;
+        continue;
+      }
+      const target = unquote(args[0]);
       if (!STATIC_PATH.test(target)) {
         baseUnknown = true;
         continue;
