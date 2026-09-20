@@ -22,6 +22,18 @@ export const sheetsAppend: Integration = {
     const token = readEnv("SHEETS_TOKEN");
     if (!token.ok) return token;
 
+    // Вебхук несе SHEETS_TOKEN у query string: по http це відправило б секрет
+    // і дані ліда відкритим каналом.
+    let scheme: string;
+    try {
+      scheme = new URL(webhookUrl.value).protocol;
+    } catch {
+      return { ok: false, error: "sheets-append: SHEETS_WEBHOOK_URL is not a valid URL" };
+    }
+    if (scheme !== "https:") {
+      return { ok: false, error: `sheets-append: SHEETS_WEBHOOK_URL must use https, got ${scheme}` };
+    }
+
     const url = webhookUrl.value + "?token=" + token.value;
     const response = await postJson(url, {
       values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],

@@ -73,6 +73,11 @@ const cases = [
   ["cp У core — блокує", BLOCK, bash(`cp /tmp/x.ts ${CORE}`)],
   ["cd app, запис у core", BLOCK, bash("cd app && echo x > src/core/log.ts")],
 
+  // --- регресії за рев'ю CodeRabbit ---
+  ["cd падає, || — shell у корені", BLOCK, bash(`cd missing || echo x > ${CORE}`)],
+  ["cd падає, ; — shell у корені", BLOCK, bash(`cd missing ; echo x > ${CORE}`)],
+  ["ланцюжок cd не губить корінь", BLOCK, bash(`cd app || cd /tmp || echo x > ${CORE}`)],
+
   // --- некоректний вхід: fail-closed ---
   ["stdin не JSON", BLOCK, "це не json"],
 
@@ -93,7 +98,26 @@ for (const [name, expected, event] of cases) {
   console.log(`${tag} ${name.padEnd(32)} очікували ${expected}, отримали ${code}`);
 }
 
+// Регресія: шлях із пробілом не повинен вимикати хук (pathToFileURL).
+import { copyFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+const spaceDir = mkdtempSync(resolve(tmpdir(), "hook test ")) + " dir";
+import { mkdirSync } from "node:fs";
+mkdirSync(spaceDir, { recursive: true });
+const spacedHook = resolve(spaceDir, "protect-core.mjs");
+copyFileSync(hook, spacedHook);
+{
+  const r = spawnSync(process.execPath, [spacedHook], {
+    input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: CORE } }),
+    env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir },
+    encoding: "utf8",
+  });
+  const ok = r.status === BLOCK;
+  if (!ok) failed++;
+  console.log(`${ok ? "ok   " : "FAIL "} ${"шлях із пробілом не вимикає хук".padEnd(32)} очікували ${BLOCK}, отримали ${r.status}`);
+}
+
 const sample = run({ tool_name: "Edit", tool_input: { file_path: CORE } });
 console.log(`\nstderr при блокуванні:\n${sample.stderr}`);
-console.log(failed === 0 ? `Усі ${cases.length} перевірок пройдено.` : `${failed} з ${cases.length} НЕ пройдено.`);
+console.log(failed === 0 ? `Усі ${cases.length + 1} перевірок пройдено.` : `${failed} з ${cases.length} НЕ пройдено.`);
 process.exit(failed === 0 ? 0 : 1);

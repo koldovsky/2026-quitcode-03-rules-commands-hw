@@ -13,6 +13,8 @@
 // аргументи операцій запису. Читання (cat, grep, shasum) не блокується.
 // Відомі межі покриття — у docs/verification.md, розділ Task E.
 import { relative, resolve, sep } from "node:path";
+import { realpathSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Шляхи відносно кореня репо. Джерело: materials/architecture-brief.md. */
 const PROTECTED = ["app/src/core", "app/scripts", "materials", ".coderabbit.yaml", ".github"];
@@ -69,8 +71,18 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
   if (typeof command !== "string") return null;
   if (WRITE_LOCK.test(command)) return "app/scripts (--write-lock перезаписує core.lock.json)";
 
-  // Поточна тека може змінюватись усередині команди: `cd app && echo x > ...`
-  let base = cwd;
+  // Поточна тека може змінюватись усередині команди: `cd app && echo x > ...`.
+  // Оператори shell при розбитті втрачаються, тож невідомо, чи `cd` вдався:
+  // у `cd missing || echo x > …` він падає, і shell лишається де був.
+  // Тому тримаємо НАБІР можливих тек і блокуємо, якщо ціль захищена хоч в одній.
+  let bases = new Set([cwd]);
+  const hitAny = (token) => {
+    for (const b of bases) {
+      const zone = protectedHit(token, projectDir, b);
+      if (zone) return zone;
+    }
+    return null;
+  };
 
   for (const segment of segments(command)) {
     const tokens = tokenize(segment);
@@ -79,22 +91,26 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
     const name = unquote(tokens[0]).split("/").pop();
     const rest = tokens.slice(1);
 
-    // 0. Відстежуємо cd, щоб відносні шляхи далі рахувались правильно
+    // 0. cd: додаємо нову теку, стару НЕ прибираємо — cd міг не вдатися
     if (name === "cd" && rest.length > 0) {
-      base = resolve(base, unquote(rest[0]));
+      const target = unquote(rest[0]);
+      const next = new Set(bases);
+      for (const b of bases) next.add(resolve(b, target));
+      // обмежуємо зростання набору на довгих ланцюжках cd
+      bases = next.size > 8 ? new Set([...next].slice(0, 8)) : next;
       continue;
     }
 
     // 1. Цілі перенаправлення: > файл, >> файл (і злитно: >файл)
     for (const m of segment.matchAll(/>>?\s*("[^"]*"|'[^']*'|[^\s;&|<>]+)/g)) {
-      const zone = protectedHit(m[1], projectDir, base);
+      const zone = hitAny(m[1]);
       if (zone) return zone;
     }
 
     // 2. sed -i / perl -i: редагування на місці — усі файлові аргументи є цілями
     if ((name === "sed" || name === "perl") && rest.some((t) => /^-[a-zA-Z]*i/.test(t))) {
       for (const t of rest) {
-        const zone = protectedHit(t, projectDir, base);
+        const zone = hitAny(t);
         if (zone) return zone;
       }
       continue;
@@ -103,7 +119,7 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
     // 3. git-підкоманди, що переписують робочу теку
     if (name === "git" && ["apply", "checkout", "restore", "rm", "mv", "clean"].includes(unquote(rest[0] ?? ""))) {
       for (const t of rest.slice(1)) {
-        const zone = protectedHit(t, projectDir, base);
+        const zone = hitAny(t);
         if (zone) return zone;
       }
       continue;
@@ -112,7 +128,7 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
     // 4. Команди, що змінюють будь-який зі своїх аргументів
     if (MUTATING_ALL.has(name)) {
       for (const t of rest) {
-        const zone = protectedHit(t, projectDir, base);
+        const zone = hitAny(t);
         if (zone) return zone;
       }
       continue;
@@ -122,7 +138,7 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
     if (MUTATING_DEST.has(name)) {
       const args = rest.filter((t) => !t.startsWith("-"));
       const dest = args[args.length - 1];
-      const zone = protectedHit(dest, projectDir, base);
+      const zone = hitAny(dest);
       if (zone) return zone;
     }
   }
@@ -181,4 +197,20 @@ function main() {
   });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+// Чи запущено файл напряму. Наївне порівняння з `file://${process.argv[1]}`
+// ламається на пробілах у шляху (import.meta.url URL-кодований) і на симлінках
+// (напр. /var → /private/var у macOS). Наслідок був би тихий і найгірший із
+// можливих: main() не запускається, хук завершується кодом 0 і пропускає все.
+// Тому порівнюємо канонізовані шляхи, а за будь-якої невизначеності —
+// запускаємо main(): для захисного хука хибне спрацювання дешевше за пропуск.
+function isEntryPoint() {
+  const entry = process.argv[1];
+  if (!entry) return true;
+  try {
+    return pathToFileURL(realpathSync(entry)).href === pathToFileURL(realpathSync(fileURLToPath(import.meta.url))).href;
+  } catch {
+    return true;
+  }
+}
+
+if (isEntryPoint()) main();

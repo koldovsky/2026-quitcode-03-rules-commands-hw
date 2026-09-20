@@ -41,4 +41,19 @@ describe("sheets-append", () => {
 
     await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: false, error: "sheets error: quota_exceeded" });
   });
+  // Знайдено рев'ю CodeRabbit: вебхук несе токен у query string.
+  it("відхиляє http: токен не можна слати відкритим каналом", async () => {
+    vi.stubEnv("SHEETS_WEBHOOK_URL", "http://sheets.example.test/append");
+    const calls: unknown[] = [];
+    vi.stubGlobal("fetch", async (...args: unknown[]) => {
+      calls.push(args);
+      return new Response("{}", { status: 200 });
+    });
+
+    const result = await sheetsAppend.send(lead);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("https");
+    expect(calls).toEqual([]);
+  });
 });

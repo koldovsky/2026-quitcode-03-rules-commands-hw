@@ -3,6 +3,7 @@
 // Інцидент 09–10.09.2026: чекпоінт зберігався лише в кінці пакета, а планувальник
 // вбивав прогін на 4х30с — тож прогрес не фіксувався ніколи. Тому стан тепер
 // зберігається після кожного повністю доставленого ліда.
+import { existsSync } from "node:fs";
 import { log } from "../core/log.js";
 import type { Integration, Lead } from "../core/types.js";
 import { loadState, saveState } from "./state.js";
@@ -37,7 +38,7 @@ export async function runSync(
   let failed = 0;
   let checkpoint = state.lastSyncedAt;
 
-  for (const lead of pending) {
+  for (const [index, lead] of pending.entries()) {
     let leadDelivered = true;
     for (const integration of integrations) {
       const result = await integration.send(lead);
@@ -55,6 +56,14 @@ export async function runSync(
       break;
     }
 
+    // Чекпоінт — це межа «все до неї доставлено». Якщо кілька лідів мають
+    // однаковий createdAt, просунути її після першого не можна: обрив до
+    // доставки решти групи назавжди приховав би їх від фільтра `>`.
+    // Тому межа рухається лише на межі групи. Ціна — повтор уже надісланих
+    // лідів тієї ж секунди після обриву; втрата ліда коштувала б дорожче.
+    const next = pending[index + 1];
+    if (next !== undefined && next.createdAt === lead.createdAt) continue;
+
     if (lead.createdAt > checkpoint) checkpoint = lead.createdAt;
     const saved = saveState(statePath, { lastSyncedAt: checkpoint });
     if (!saved.ok) {
@@ -63,9 +72,10 @@ export async function runSync(
     }
   }
 
-  if (pending.length === 0 && checkpoint === state.lastSyncedAt) {
-    // Перший запуск без нових лідів: створюємо файл стану, щоб він існував.
-    const saved = saveState(statePath, state);
+  if (!existsSync(statePath)) {
+    // Перший запуск: створюємо файл стану, щоб він існував. Саме безумовний
+    // запис на кожному тику дав два ENOSPC-краші в інциденті — тому лише тут.
+    const saved = saveState(statePath, { lastSyncedAt: checkpoint });
     if (!saved.ok) log.error(`sync: ${saved.error}`);
   }
 

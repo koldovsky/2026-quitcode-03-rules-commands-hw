@@ -42,4 +42,13 @@ paths:
 - `cd app && npm run typecheck` зелений — вигаданий експорт із core не скомпілюється.
 - Для нової інтеграції `git status --short app/src` показує рівно три шляхи:
   модуль, тест, `index.ts`.
-- `grep -rn "from \"\.\./sync" app/src/integrations app/src/core` → порожньо.
+- Напрям імпортів (усі три заборонені напрями, лапки будь-які):
+  ```bash
+  cd app && grep -rnE "from ['\"][^'\"]*(\.\./)*(sync|integrations)/" src/core src/integrations \
+    | grep -v "src/integrations/index.ts"
+  ```
+  → порожньо. Окремо: `sync/` бачить інтеграції лише через реєстр —
+  ```bash
+  cd app && grep -rnE "from ['\"].*integrations/" src/sync | grep -v "integrations/index"
+  ```
+  → порожньо.

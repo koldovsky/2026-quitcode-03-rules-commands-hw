@@ -46,6 +46,17 @@ describe("loadState", () => {
     if (!result.ok) expect(result.error).toContain("unexpected shape");
   });
 
+  // Знайдено рев'ю CodeRabbit: форми замало, потрібна календарна перевірка.
+  it("неможлива дата — помилка, хоч і відповідає шаблону", () => {
+    writeFileSync(statePath, JSON.stringify({ lastSyncedAt: "9999-99-99T99:99:99.999Z" }));
+    expect(loadState(statePath).ok).toBe(false);
+  });
+
+  it("неіснуючий день місяця — помилка", () => {
+    writeFileSync(statePath, JSON.stringify({ lastSyncedAt: "2026-02-30T00:00:00.000Z" }));
+    expect(loadState(statePath).ok).toBe(false);
+  });
+
   it("неканонічна дата — помилка: дати порівнюються як рядки", () => {
     writeFileSync(statePath, JSON.stringify({ lastSyncedAt: "2026-09-09T23:55:00Z" }));
     expect(loadState(statePath).ok).toBe(false);

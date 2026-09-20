@@ -108,6 +108,33 @@ describe("runSync", () => {
     expect(sentAgain).toEqual(["ld_0003"]);
   });
 
+  // Знайдено рев'ю CodeRabbit: курсор `lastSyncedAt` неоднозначний, коли два
+  // ліди мають однаковий createdAt.
+  it("не губить лід із таким самим createdAt після обриву", async () => {
+    const statePath = join(dir, "sync-state.json");
+    const sameTime = "2026-09-09T12:00:00.000Z";
+    const twins = [makeLead("ld_a", sameTime), makeLead("ld_b", sameTime)];
+    const sent: string[] = [];
+
+    const dying: Integration = {
+      name: "dying",
+      requiredEnv: [],
+      send: async (lead) => {
+        if (lead.id === "ld_b") throw new Error("обрив між лідами тієї ж секунди");
+        sent.push(lead.id);
+        return { ok: true, value: undefined };
+      },
+    };
+
+    await expect(runSync(twins, [dying], statePath)).rejects.toThrow();
+    expect(sent).toEqual(["ld_a"]);
+
+    // Чекпоінт не має стояти на sameTime — інакше ld_b зникне назавжди.
+    const sentAgain: string[] = [];
+    await runSync(twins, [recordingIntegration(sentAgain)], statePath);
+    expect(sentAgain).toContain("ld_b");
+  });
+
   it("не просуває чекпоінт повз недоставлений лід", async () => {
     const sent: string[] = [];
     const statePath = join(dir, "sync-state.json");

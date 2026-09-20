@@ -33,9 +33,9 @@ const testOut = execSync("npm test 2>&1 | grep -E '^ *Tests'", { cwd: `${REPO}/a
 const nTests = Number(testOut.match(/Tests\s+(\d+) passed/)[1]);
 const rulesOut = execSync("npm run check:rules 2>&1 | grep TOTAL", { cwd: `${REPO}/app`, shell: "/bin/zsh" }).toString();
 const nViol = Number(rulesOut.match(/TOTAL: (\d+)/)[1]);
-check(`реальні тести = ${nTests}`, nTests === 35);
+check(`реальні тести = ${nTests}`, nTests === 39);
 check(`реальний TOTAL = ${nViol}`, nViol === 0);
-check("AGENTS.md заявляє актуальний стан", agents.includes("**35 тестів зелені**") && agents.includes("**TOTAL: 0**"));
+check("AGENTS.md заявляє актуальний стан", agents.includes("**39 тестів зелені**") && agents.includes("**TOTAL: 0**"));
 check("ab-validation фіксує базову лінію, що була НА МОМЕНТ прогонів", ab.includes("**23 passed (7 files)**") && ab.includes("**TOTAL: 1**"));
 
 // 3. Тести хука
@@ -100,7 +100,12 @@ for (const [arm, calls] of [["a", 9], ["b", 13]]) {
   const t = readFileSync(`${REPO}/docs/ab/transcript-opus-${arm}.md`, "utf8");
   const m = t.match(/викликів інструментів: (\d+)/);
   check(`transcript-opus-${arm}: ${m[1]} викликів у ході 1`, Number(m[1]) === calls);
-  check(`ab-validation цитує це число для Opus ${arm.toUpperCase()}`, ab.includes(`| ${calls} |`));
+  // Число має стояти саме у своїй колонці, інакше перестановка A/B пройшла б непоміченою
+  const opusSection = ab.slice(ab.indexOf("## Другий A/B — модель Opus"));
+  const row = opusSection.split("\n").find((l) => l.startsWith("| Викликів інструментів (хід 1)"));
+  const cols = (row ?? "").split("|").map((c) => c.trim());
+  check(`ab-validation ставить ${calls} у колонку ${arm.toUpperCase()}`,
+    cols[arm === "b" ? 2 : 3] === String(calls), `рядок: ${row ?? "не знайдено"}`);
 }
 check("ab-validation не заявляє різниці в захисті ядра на Opus",
   ab.includes("Різниця в захисті ядра | **є** | **немає** |"));

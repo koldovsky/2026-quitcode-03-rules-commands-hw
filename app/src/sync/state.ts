@@ -19,8 +19,20 @@ const INITIAL_STATE: SyncState = { lastSyncedAt: "1970-01-01T00:00:00.000Z" };
 /** Канонічний ISO-8601 з мілісекундами: дати порівнюються як рядки, тож формат має бути один. */
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
+/**
+ * Форми замало: `"9999-99-99T99:99:99.999Z"` відповідає шаблону, але такої дати
+ * не існує. Прийнявши її, ми отримали б чекпоінт «у майбутньому», який рядковим
+ * порівнянням відсіює всіх реальних лідів — синхронізація тихо припинилась би.
+ * Тому вимагаємо, щоб значення пережило обіг через Date без втрат.
+ */
+function isCanonicalIsoUtc(value: unknown): value is string {
+  if (!isString(value) || !ISO_UTC.test(value)) return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
+}
+
 const isSyncState: Guard<SyncState> = (value): value is SyncState =>
-  isRecord(value) && isString(value.lastSyncedAt) && ISO_UTC.test(value.lastSyncedAt);
+  isRecord(value) && isCanonicalIsoUtc(value.lastSyncedAt);
 
 /**
  * Читає стан. Відсутній файл — це штатний перший запуск.
