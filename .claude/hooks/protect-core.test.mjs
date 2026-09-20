@@ -5,6 +5,7 @@
 // Останній блок — ВІДОМІ МЕЖІ: випадки, які хук свідомо не ловить.
 // Вони перевіряються так само, щоб документація не розійшлась із поведінкою.
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -40,12 +41,73 @@ const CASES = [
   ["Bash: звичайні тести", bash("cd app && npm test"), 0],
   ["Bash: запис у дозволений шлях", bash("echo x > docs/verification.md"), 0],
 
+  // Переблокування коштує не менше за пропущений запис: обидва випадки нижче
+  // хук колись блокував, хоч жоден із них нічого в захищену зону не пише.
+  ["Bash: 2>&1 при згадці ядра — не запис", bash("npm test 2>&1 | grep app/src/core"), 0],
+  ["Bash: >/dev/null при згадці ядра — не запис", bash('echo "probe app/src/core" > /dev/null'), 0],
+  [
+    "Bash: ядро згадане лише в тілі heredoc",
+    bash("git commit -F - <<'MSG'\nfix: app/src/core/log.ts не торкнуто\nMSG"),
+    0,
+  ],
+  [
+    "Bash: heredoc не ховає справжній запис поза ним",
+    bash("cat <<'MSG' > app/src/core/log.ts\nx\nMSG"),
+    2,
+  ],
+
   ["ВІДОМА МЕЖА: шлях зібрано зі змінної", bash("P=app/src; echo x > $P/core/log.ts"), 0],
   ["ВІДОМА МЕЖА: шлях у base64", bash(`echo YXBwL3NyYy9jb3JlL2xvZy50cw== | base64 -d | xargs -I{} sh -c "echo x > {}"`), 0],
   ["ВІДОМА МЕЖА: биті вхідні дані", "не json", 0],
 ];
 
+// --- Проводка -----------------------------------------------------------
+// Скрипт може бути правильним, а хук — не викликатись: саме так гілка Bash
+// одного разу висіла мертвою, бо в matcher її не було. Тому перевіряємо не лише
+// логіку, а й те, що settings.json справді спрямовує сюди потрібні інструменти.
+const WIRED_TOOLS = ["Edit", "Write", "NotebookEdit", "Bash"];
+
+function checkWiring() {
+  const problems = [];
+  const settingsPath = resolve(projectDir, ".claude", "settings.json");
+
+  let settings;
+  try {
+    settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+  } catch (error) {
+    return [`.claude/settings.json не читається або не JSON: ${error.message}`];
+  }
+
+  const entries = settings?.hooks?.PreToolUse ?? [];
+  const entry = entries.find((item) =>
+    (item?.hooks ?? []).some((h) => typeof h?.command === "string" && h.command.includes("protect-core.mjs")),
+  );
+  if (!entry) return ["у settings.json немає PreToolUse-хука на protect-core.mjs"];
+
+  const matcher = String(entry.matcher ?? "");
+  for (const tool of WIRED_TOOLS) {
+    if (!matcher.split("|").includes(tool)) {
+      problems.push(`matcher "${matcher}" не містить ${tool} — гілка для нього не працюватиме`);
+    }
+  }
+
+  const command = entry.hooks.find((h) => h.command.includes("protect-core.mjs")).command;
+  if (!command.includes("CLAUDE_PROJECT_DIR")) {
+    problems.push("виклик хука без $CLAUDE_PROJECT_DIR — зламається при іншому робочому каталозі");
+  }
+  return problems;
+}
+
 let failed = 0;
+
+const wiringProblems = checkWiring();
+for (const problem of wiringProblems) console.log(`  FAIL  проводка: ${problem}`);
+if (wiringProblems.length === 0) {
+  console.log(`  ok    проводка: settings.json спрямовує ${WIRED_TOOLS.join(", ")} у protect-core.mjs через $CLAUDE_PROJECT_DIR`);
+} else {
+  failed += wiringProblems.length;
+}
+
 for (const [name, stdin, expected] of CASES) {
   const run = spawnSync("node", [hook], { input: stdin, env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir } });
   const ok = run.status === expected;
@@ -53,5 +115,6 @@ for (const [name, stdin, expected] of CASES) {
   console.log(`  ${ok ? "ok  " : "FAIL"}  exit ${run.status} (очікувано ${expected})  ${name}`);
 }
 
-console.log(`\n${CASES.length - failed}/${CASES.length} випадків поводяться як заявлено`);
+const total = CASES.length + 1; // + перевірка проводки
+console.log(`\n${total - failed}/${total} перевірок пройдено`);
 process.exit(failed > 0 ? 1 : 0);

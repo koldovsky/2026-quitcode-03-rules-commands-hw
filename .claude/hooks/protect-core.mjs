@@ -55,9 +55,14 @@ const toolInput = input?.tool_input ?? {};
 // разом із ознакою запису. Це фільтр, а не пісочниця — межі описані в
 // docs/verification.md, Task E.
 if (toolName === "Bash") {
-  const command = typeof toolInput.command === "string" ? toolInput.command : "";
+  const rawCommand = typeof toolInput.command === "string" ? toolInput.command : "";
 
-  if (/--write-lock/.test(command)) {
+  // Тіло heredoc — це дані (повідомлення коміту, вміст файлу), а не операція над
+  // шляхом. Без цього `git commit <<MSG ... <захищений шлях> ... MSG` блокує сам себе.
+  // Решта рядка з `<<TAG` лишається: саме там стоїть `> файл` у `cat <<MSG > файл`.
+  const command = rawCommand.replace(/(<<-?\s*'?"?(\w+)'?"?[^\n]*)\n[\s\S]*?^\2$/gm, "$1");
+
+  if (/--write-lock/.test(rawCommand)) {
     console.error(
       "protect-core: --write-lock переписує app/scripts/core.lock.json і ховає зміну ядра. " +
         "Заблоковано, див. .claude/rules/do-not-touch.md.",
@@ -65,11 +70,18 @@ if (toolName === "Bash") {
     process.exit(2);
   }
 
+  // Перенаправлення розбираємо явно: `2>&1` дублює дескриптор, `> /dev/null`
+  // викидає вивід — ні те, ні те не пише у файл. Регексп із lookahead тут не
+  // годиться: `\s*` відкочується і пропускає ціль повз перевірку.
+  const redirectsToFile = [...command.matchAll(/(^|\s)\d?>>?\s*([^\s|;&]+)/g)].some(
+    ([, , target]) => target !== "/dev/null",
+  );
+
   const WRITE_HINTS =
-    /(>>?[^>]|\btee\b|\bsed\b[^|]*-i|\brm\b|\bmv\b|\bcp\b|\btruncate\b|\bdd\b|\bchmod\b|writeFileSync|appendFileSync|createWriteStream|write_text|open\([^)]*,\s*["'][wax]|\bpatch\b|git\s+(?:checkout|restore|apply|clean))/;
+    /(\btee\b|\bsed\b[^|]*-i|\brm\b|\bmv\b|\bcp\b|\btruncate\b|\bdd\b|\bchmod\b|writeFileSync|appendFileSync|createWriteStream|write_text|open\([^)]*,\s*["'][wax]|\bpatch\b|git\s+(?:checkout|restore|apply|clean))/;
   const mentioned = PROTECTED.find((prefix) => command.includes(prefix.replace(/\/$/, "")));
 
-  if (mentioned && WRITE_HINTS.test(command)) {
+  if (mentioned && (redirectsToFile || WRITE_HINTS.test(command))) {
     console.error(
       `protect-core: команда змінює захищену зону (${mentioned}), заблоковано.\n` +
         "Див. .claude/rules/do-not-touch.md. Читати ці файли можна — змінювати ні.",
