@@ -12,7 +12,7 @@ Node 22+, Vitest, нуль runtime-залежностей. Дані в репо�
 | Команда | Для чого |
 |---|---|
 | `npm install` | встановлення, перший запуск |
-| `npm test` | Vitest; базова лінія — 31 тест зелений |
+| `npm test` | Vitest; базова лінія — 38 тестів зелені |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run check:rules` | статична перевірка конвенцій; базова лінія — `TOTAL: 0` |
 | `npm run check:rules -- --strict` | те саме з ненульовим кодом виходу — для CI і хуків |
@@ -51,5 +51,5 @@ Node 22+, Vitest, нуль runtime-залежностей. Дані в репо�
 cd app && npm test && npm run typecheck && npm run check:rules
 ```
 
-Очікується: 31 тест зелений, typecheck без помилок, `TOTAL: 0`,
+Очікується: 38 тестів зелені, typecheck без помилок, `TOTAL: 0`,
 `core-untouched 0`. У `git status --short` немає жодного із захищених шляхів.

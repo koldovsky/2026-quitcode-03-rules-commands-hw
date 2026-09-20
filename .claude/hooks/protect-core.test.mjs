@@ -55,6 +55,11 @@ const CASES = [
     bash("cat <<'MSG' > app/src/core/log.ts\nx\nMSG"),
     2,
   ],
+  [
+    "Bash: --write-lock лише згаданий у тексті документа",
+    bash("cat > docs/verification.md <<'DOC'\nне запускай npm run check:rules -- --write-lock\nDOC"),
+    0,
+  ],
 
   ["ВІДОМА МЕЖА: шлях зібрано зі змінної", bash("P=app/src; echo x > $P/core/log.ts"), 0],
   ["ВІДОМА МЕЖА: шлях у base64", bash(`echo YXBwL3NyYy9jb3JlL2xvZy50cw== | base64 -d | xargs -I{} sh -c "echo x > {}"`), 0],

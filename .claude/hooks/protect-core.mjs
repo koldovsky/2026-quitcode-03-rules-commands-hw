@@ -62,7 +62,9 @@ if (toolName === "Bash") {
   // Решта рядка з `<<TAG` лишається: саме там стоїть `> файл` у `cat <<MSG > файл`.
   const command = rawCommand.replace(/(<<-?\s*'?"?(\w+)'?"?[^\n]*)\n[\s\S]*?^\2$/gm, "$1");
 
-  if (/--write-lock/.test(rawCommand)) {
+  // Перевіряємо по команді без тіла heredoc: прапорець, згаданий у тексті
+  // документа чи повідомлення коміту, нічого не переписує.
+  if (/--write-lock/.test(command)) {
     console.error(
       "protect-core: --write-lock переписує app/scripts/core.lock.json і ховає зміну ядра. " +
         "Заблоковано, див. .claude/rules/do-not-touch.md.",
