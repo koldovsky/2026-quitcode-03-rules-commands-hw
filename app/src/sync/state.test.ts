@@ -79,6 +79,17 @@ describe("saveState", () => {
     expect(loadState(statePath)).toEqual({ ok: true, value: { lastSyncedAt: "2026-09-10T08:00:00.000Z" } });
   });
 
+  // Той самий ENOSPC, що почав інцидент, приходить саме сюди. Помилка запису має
+  // стати значенням, інакше вона летить необробленим винятком до runSync.
+  it("повертає помилку, а не кидає виняток, коли записати не вдається", () => {
+    const unwritable = join(dir, "неіснуюча-тека", "sync-state.json");
+
+    const result = saveState(unwritable, { lastSyncedAt: "2026-09-10T08:00:00.000Z" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("sync-state: cannot write");
+  });
+
   it("пише атомарно: тимчасового файлу після запису не лишається", () => {
     saveState(statePath, { lastSyncedAt: "2026-09-10T08:00:00.000Z" });
 

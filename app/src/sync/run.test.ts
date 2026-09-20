@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Integration, Lead } from "../core/types.js";
 import { runSync } from "./run.js";
+import { loadState } from "./state.js";
 
 const makeLead = (id: string, createdAt: string): Lead => ({
   id,
@@ -119,6 +120,34 @@ describe("runSync", () => {
       ld_0003: { lastSyncedAt: "2026-09-09T11:00:00.000Z" },
     });
     expect(JSON.parse(readFileSync(statePath, "utf8"))).toEqual({ lastSyncedAt: "2026-09-10T08:00:00.000Z" });
+  });
+
+  // Lead.createdAt — це string, тож форма без мілісекунд типу не суперечить.
+  // Якщо записати її в стан як є, наступний loadState відхилить власний же запис.
+  it("канонізує неканонічну дату ліда перед записом у стан", async () => {
+    const sent: string[] = [];
+    const statePath = join(dir, "sync-state.json");
+    const odd = [makeLead("ld_0009", "2026-09-09T10:30:00Z")]; // без мілісекунд і без зсуву
+
+    await runSync(odd, [recordingIntegration(sent)], statePath);
+
+    expect(sent).toEqual(["ld_0009"]);
+    expect(JSON.parse(readFileSync(statePath, "utf8"))).toEqual({
+      lastSyncedAt: "2026-09-09T10:30:00.000Z",
+    });
+    // Найважливіше: наступний прогін має цей стан прочитати, а не спіткнутись об нього.
+    expect(loadState(statePath)).toEqual({ ok: true, value: { lastSyncedAt: "2026-09-09T10:30:00.000Z" } });
+  });
+
+  it("пропускає лід із нерозбірливим createdAt і не рухає контрольну точку", async () => {
+    const sent: string[] = [];
+    const statePath = join(dir, "sync-state.json");
+
+    const report = await runSync([makeLead("ld_0010", "позавчора")], [recordingIntegration(sent)], statePath);
+
+    expect(sent).toEqual([]);
+    expect(report).toEqual({ pending: 0, delivered: 0, failed: 0 });
+    expect(console.error).toHaveBeenCalled();
   });
 
   it("невдалий лід не дає контрольній точці перестрибнути через нього", async () => {

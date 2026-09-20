@@ -81,7 +81,22 @@ if (toolName === "Bash") {
 
   const WRITE_HINTS =
     /(\btee\b|\bsed\b[^|]*-i|\brm\b|\bmv\b|\bcp\b|\btruncate\b|\bdd\b|\bchmod\b|writeFileSync|appendFileSync|createWriteStream|write_text|open\([^)]*,\s*["'][wax]|\bpatch\b|git\s+(?:checkout|restore|apply|clean))/;
-  const mentioned = PROTECTED.find((prefix) => command.includes(prefix.replace(/\/$/, "")));
+
+  // Шлях у команді звіряємо після нормалізації, а не як текст: рядок
+  // `app/src/integrations/../core/log.ts` не містить підрядка `app/src/core`,
+  // але оболонка запише саме в ядро.
+  function hitFor(candidate) {
+    const path = toProjectPath(candidate);
+    if (path === null) return undefined;
+    return PROTECTED.find((prefix) =>
+      prefix.endsWith("/") ? path.startsWith(prefix) || `${path}/` === prefix : path === prefix,
+    );
+  }
+
+  const pathTokens = command.match(/[A-Za-z0-9._~@+-]*(?:\/[A-Za-z0-9._~@+-]+)+\/?/g) ?? [];
+  const mentioned =
+    PROTECTED.find((prefix) => command.includes(prefix.replace(/\/$/, ""))) ??
+    pathTokens.map(hitFor).find(Boolean);
 
   if (mentioned && (redirectsToFile || WRITE_HINTS.test(command))) {
     console.error(

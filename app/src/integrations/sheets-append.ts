@@ -19,9 +19,14 @@ const sheetsAppend: Integration = {
     if (!token.ok) return token;
 
     const url = `${webhookUrl.value}?token=${token.value}`;
-    const response = await postJson(url, {
-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
-    });
+    // retries: 0 — додавання рядка неідемпотентне. Стара реалізація робила рівно
+    // один fetch; дефолтні два повтори postJson дописували б дублікати щоразу,
+    // коли відповідь губиться або приходить 5xx уже після запису рядка.
+    const response = await postJson(
+      url,
+      { values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]] },
+      { retries: 0 },
+    );
     if (!response.ok) {
       log.error(`sheets-append: lead ${lead.id} not delivered: ${response.error}`);
       return response;

@@ -51,6 +51,19 @@ describe("sheets-append", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  // Додавання рядка неідемпотентне: повтор після загубленої відповіді або 5xx
+  // дописав би дублікат. Стара реалізація робила рівно один fetch — зберігаємо це.
+  it("не повторює запит при помилці сервера", async () => {
+    const fetchMock = vi.fn(async () => new Response("boom", { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await sheetsAppend.send(lead);
+
+    expect(result.ok).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("повертає помилку, якщо таблиця відповіла не ok", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"status":"quota_exceeded"}', { status: 200 })));
 

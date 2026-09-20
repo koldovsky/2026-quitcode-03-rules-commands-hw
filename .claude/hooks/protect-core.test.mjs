@@ -61,6 +61,12 @@ const CASES = [
     0,
   ],
 
+  // Обхід через ../ : у тексті команди підрядка `app/src/core` немає, але
+  // оболонка нормалізує шлях і запише саме в ядро.
+  ["Bash: запис у ядро через ../", bash("echo x > app/src/integrations/../core/log.ts"), 2],
+  ["Bash: sed -i у ядро через ../", bash('sed -i "" s/a/b/ app/src/sync/../core/http.ts'), 2],
+  ["Bash: читання ядра через ../ лишається дозволеним", bash("cat app/src/integrations/../core/log.ts"), 0],
+
   ["ВІДОМА МЕЖА: шлях зібрано зі змінної", bash("P=app/src; echo x > $P/core/log.ts"), 0],
   ["ВІДОМА МЕЖА: шлях у base64", bash(`echo YXBwL3NyYy9jb3JlL2xvZy50cw== | base64 -d | xargs -I{} sh -c "echo x > {}"`), 0],
   ["ВІДОМА МЕЖА: биті вхідні дані", "не json", 0],
