@@ -1,0 +1,74 @@
+diff --git a/app/src/core/types.ts b/app/src/core/types.ts
+index 72303a0..3f0549a 100644
+--- a/app/src/core/types.ts
++++ b/app/src/core/types.ts
+@@ -8,6 +8,8 @@ export interface Lead {
+   email: string;
+   phone?: string;
+   source: "website" | "instagram" | "referral";
++  /** Рекламна кампанія з форми сайту (`utmCampaign`). Форма може її не передати. */
++  utmCampaign?: string;
+   budgetUsd?: number;
+   /** ISO-8601, UTC. */
+   createdAt: string;
+diff --git a/app/src/integrations/sheets-append.test.ts b/app/src/integrations/sheets-append.test.ts
+index f81dc35..368ed19 100644
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -27,12 +27,38 @@ describe("sheets-append", () => {
+     const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
+     vi.stubGlobal("fetch", fetchMock);
+ 
+-    await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: true, value: undefined });
++    await expect(sheetsAppend.send({ ...lead, utmCampaign: "spring-sale-2026" })).resolves.toEqual({
++      ok: true,
++      value: undefined,
++    });
+ 
+     const [url, init] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+     expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [
++        [
++          "2026-09-10T09:30:00.000Z",
++          "Андрій Тестовий",
++          "andrii@studio-nova.example.test",
++          "",
++          "instagram",
++          "spring-sale-2026",
++        ],
++      ],
++    });
++  });
++
++  // Форма може не передати utmCampaign. Колонка все одно має бути на місці —
++  // інакше поля рядка поїдуть, щойно в таблиці з'явиться ще одна колонка.
++  it("лишає колонку кампанії порожньою, якщо форма її не передала", async () => {
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: true, value: undefined });
++
++    const [, init] = fetchMock.mock.calls[0]!;
++    expect(JSON.parse(String(init?.body))).toEqual({
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
+     });
+   });
+ 
+diff --git a/app/src/integrations/sheets-append.ts b/app/src/integrations/sheets-append.ts
+index 3f3e612..87d42dd 100644
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -20,7 +20,10 @@ const sheetsAppend: Integration = {
+ 
+     const url = `${webhookUrl.value}?token=${token.value}`;
+     const response = await postJson(url, {
+-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
++      values: [
++        // Кампанія — остання колонка: старі рядки таблиці лишаються на своїх місцях.
++        [lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, lead.utmCampaign ?? ""],
++      ],
+     });
+     if (!response.ok) {
+       log.error(`sheets-append: lead ${lead.id} not delivered: ${response.error}`);
