@@ -81,7 +81,11 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
   // зокрема в ядро, тож переходимо у fail-closed. Абсолютні шляхи лишаються
   // обчислюваними, тож `cd $X && echo y > /tmp/z` і далі дозволено.
   let baseUnknown = false;
-  const DYNAMIC = /[$`~*?]|\$\(/;
+  // Білий список, а не чорний: перелічувати спецсимволи shell — гра в наздоганяння
+  // (уже ловилися `$`, backtick, `$()`, `~`, `*`, `?`, а потім знайшлися ще
+  // `[a]pp` і `{app,x}`, які shell теж розгортає). Статичним вважається лише
+  // шлях із літер, цифр і `. / - _`; усе інше — динамічне.
+  const STATIC_PATH = /^[A-Za-z0-9._/-]+$/;
 
   const hitAny = (token) => {
     if (baseUnknown && typeof token === "string") {
@@ -107,7 +111,7 @@ export function protectedInCommand(command, projectDir, cwd = projectDir) {
     // 0. cd: додаємо нову теку, стару НЕ прибираємо — cd міг не вдатися
     if (name === "cd" && rest.length > 0) {
       const target = unquote(rest[0]);
-      if (DYNAMIC.test(target)) {
+      if (!STATIC_PATH.test(target)) {
         baseUnknown = true;
         continue;
       }

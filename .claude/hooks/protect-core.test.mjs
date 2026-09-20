@@ -83,6 +83,12 @@ const cases = [
   ["cd з $(…) → fail-closed", BLOCK, bash("cd $(pwd)/app && echo x > src/core/log.ts")],
   ["cd з `pwd` → fail-closed", BLOCK, bash("cd `pwd`/app && echo x > src/core/log.ts")],
   ["cd з ~ → fail-closed", BLOCK, bash("cd ~/app && echo x > src/core/log.ts")],
+  ["cd з bracket-glob → fail-closed", BLOCK, bash("cd [a]pp && echo x > src/core/log.ts")],
+  ["cd з brace-expansion → fail-closed", BLOCK, bash("cd {app,x} && echo x > src/core/log.ts")],
+  ["cd з ? → fail-closed", BLOCK, bash("cd ap? && echo x > src/core/log.ts")],
+  ["cd з * → fail-closed", BLOCK, bash("cd a* && echo x > src/core/log.ts")],
+  ["cd зі static-шляхом і .. — блокує", BLOCK, bash("cd app/../app && echo x > src/core/log.ts")],
+  ["cd за межі репо — не наша зона", ALLOW, bash("cd ../app && echo x > src/core/log.ts")],
   ["динамічний cd + абсолютний /tmp — можна", ALLOW, bash("cd $HOME && echo y > /tmp/out.txt")],
   ["динамічний cd без запису — можна", ALLOW, bash("cd $HOME && npm test")],
 
