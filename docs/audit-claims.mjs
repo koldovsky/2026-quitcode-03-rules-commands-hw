@@ -33,10 +33,10 @@ const testOut = execSync("npm test 2>&1 | grep -E '^ *Tests'", { cwd: `${REPO}/a
 const nTests = Number(testOut.match(/Tests\s+(\d+) passed/)[1]);
 const rulesOut = execSync("npm run check:rules 2>&1 | grep TOTAL", { cwd: `${REPO}/app`, shell: "/bin/zsh" }).toString();
 const nViol = Number(rulesOut.match(/TOTAL: (\d+)/)[1]);
-check(`реальні тести = ${nTests}`, nTests === 23);
-check(`реальний TOTAL = ${nViol}`, nViol === 1);
-check("AGENTS.md заявляє актуальний стан", agents.includes("**23 тести зелені**") && agents.includes("**TOTAL: 1**"));
-check("ab-validation заявляє ту саму базову лінію", ab.includes("**23 passed (7 files)**") && ab.includes("**TOTAL: 1**"));
+check(`реальні тести = ${nTests}`, nTests === 35);
+check(`реальний TOTAL = ${nViol}`, nViol === 0);
+check("AGENTS.md заявляє актуальний стан", agents.includes("**35 тестів зелені**") && agents.includes("**TOTAL: 0**"));
+check("ab-validation фіксує базову лінію, що була НА МОМЕНТ прогонів", ab.includes("**23 passed (7 files)**") && ab.includes("**TOTAL: 1**"));
 
 // 3. Тести хука
 const hookOut = execSync("node .claude/hooks/protect-core.test.mjs 2>&1 | tail -1", { cwd: REPO, shell: "/bin/zsh" }).toString().trim();
