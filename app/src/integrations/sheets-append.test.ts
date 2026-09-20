@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Lead } from "../core/types.js";
-import sheetsAppend from "./sheets-append.js";
+import { sheetsAppend } from "./sheets-append.js";
 
 const lead: Lead = {
   id: "ld_0002",
@@ -40,5 +40,20 @@ describe("sheets-append", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"status":"quota_exceeded"}', { status: 200 })));
 
     await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: false, error: "sheets error: quota_exceeded" });
+  });
+  // Знайдено рев'ю CodeRabbit: вебхук несе токен у query string.
+  it("відхиляє http: токен не можна слати відкритим каналом", async () => {
+    vi.stubEnv("SHEETS_WEBHOOK_URL", "http://sheets.example.test/append");
+    const calls: unknown[] = [];
+    vi.stubGlobal("fetch", async (...args: unknown[]) => {
+      calls.push(args);
+      return new Response("{}", { status: 200 });
+    });
+
+    const result = await sheetsAppend.send(lead);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("https");
+    expect(calls).toEqual([]);
   });
 });

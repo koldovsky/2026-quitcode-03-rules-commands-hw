@@ -1,0 +1,152 @@
+diff --git a/app/src/integrations/sheets-append.test.ts b/app/src/integrations/sheets-append.test.ts
+index 7549568..7a1e0dc 100644
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -1,4 +1,5 @@
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
++import { isRecord } from "../core/parse.js";
+ import type { Lead } from "../core/types.js";
+ import { sheetsAppend } from "./sheets-append.js";
+ 
+@@ -10,10 +11,32 @@ const lead: Lead = {
+   createdAt: "2026-09-10T09:30:00.000Z",
+ };
+ 
++/**
++ * Форма сайту передає `utmCampaign`, якого немає в публічному типі `Lead`:
++ * core не редагуємо, тож у тесті описуємо поле локально — як і в самому модулі.
++ */
++type LeadWithCampaign = Lead & { utmCampaign?: unknown };
++
++type FetchMock = ReturnType<typeof okFetch>;
++
++const okFetch = () => vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++
++/** Рядок, який модуль надіслав у таблицю. */
++const sentRow = (fetchMock: FetchMock): unknown[] => {
++  const [, init] = fetchMock.mock.calls[0]!;
++  const body: unknown = JSON.parse(String(init?.body));
++  if (!isRecord(body) || !Array.isArray(body.values) || !Array.isArray(body.values[0])) {
++    throw new Error("sheets-append: неочікуване тіло запиту");
++  }
++  return body.values[0];
++};
++
++let logSpy: MockInstance<(...args: unknown[]) => void>;
++
+ beforeEach(() => {
+   vi.stubEnv("SHEETS_WEBHOOK_URL", "https://sheets.example.test/append");
+   vi.stubEnv("SHEETS_TOKEN", "fake-sheets-token-0000");
+-  vi.spyOn(console, "log").mockImplementation(() => {});
++  logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+ });
+ 
+ afterEach(() => {
+@@ -24,7 +47,7 @@ afterEach(() => {
+ 
+ describe("sheets-append", () => {
+   it("додає рядок у таблицю і повертає ok", async () => {
+-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    const fetchMock = okFetch();
+     vi.stubGlobal("fetch", fetchMock);
+ 
+     await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: true, value: undefined });
+@@ -32,8 +55,59 @@ describe("sheets-append", () => {
+     const [url, init] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+     expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
++    });
++  });
++
++  it("пише кампанію окремою колонкою в кінці рядка", async () => {
++    const fetchMock = okFetch();
++    vi.stubGlobal("fetch", fetchMock);
++    const withCampaign: LeadWithCampaign = { ...lead, utmCampaign: "spring_sale_2026" };
++
++    await expect(sheetsAppend.send(withCampaign)).resolves.toEqual({ ok: true, value: undefined });
++
++    expect(sentRow(fetchMock)).toEqual([
++      "2026-09-10T09:30:00.000Z",
++      "Андрій Тестовий",
++      "andrii@studio-nova.example.test",
++      "",
++      "instagram",
++      "spring_sale_2026",
++    ]);
++  });
++
++  it("лишає колонку кампанії порожньою, якщо поля немає", async () => {
++    const fetchMock = okFetch();
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: true, value: undefined });
++
++    const row = sentRow(fetchMock);
++    expect(row).toHaveLength(6);
++    expect(row[5]).toBe("");
++  });
++
++  it("не пише кампанію, якщо форма передала не рядок, і попереджає в журнал", async () => {
++    const fetchMock = okFetch();
++    vi.stubGlobal("fetch", fetchMock);
++    const broken: LeadWithCampaign = { ...lead, utmCampaign: 42 };
++
++    await expect(sheetsAppend.send(broken)).resolves.toEqual({ ok: true, value: undefined });
++
++    expect(sentRow(fetchMock)[5]).toBe("");
++    expect(logSpy.mock.calls.some(([line]) => String(line).includes("non-string utmCampaign"))).toBe(true);
++  });
++
++  it("повертає помилку, якщо немає змінної середовища", async () => {
++    vi.stubEnv("SHEETS_TOKEN", "");
++    const fetchMock = okFetch();
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send(lead)).resolves.toEqual({
++      ok: false,
++      error: "missing environment variable SHEETS_TOKEN",
+     });
++    expect(fetchMock).not.toHaveBeenCalled();
+   });
+ 
+   it("повертає помилку, якщо таблиця відповіла не ok", async () => {
+diff --git a/app/src/integrations/sheets-append.ts b/app/src/integrations/sheets-append.ts
+index 063cdb7..f4c1fe9 100644
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -12,6 +12,23 @@ interface SheetsResponse {
+ const isSheetsResponse: Guard<SheetsResponse> = (value): value is SheetsResponse =>
+   isRecord(value) && isString(value.status);
+ 
++/**
++ * Рекламна кампанія ліда. Форма сайту передає `utmCampaign`, але в публічному типі
++ * `Lead` цього поля немає, а `core/types.ts` не редагується (.claude/rules/do-not-touch.md),
++ * тож читаємо його тут через guard — типи однієї інтеграції живуть у її модулі.
++ * Поле відсутнє — порожня клітинка (як у `phone`); поле є, але не рядок — warn,
++ * щоб зіпсовані дані з форми не зникали тихо.
++ */
++function readCampaign(lead: Lead): string {
++  const raw: unknown = lead;
++  if (!isRecord(raw) || raw.utmCampaign === undefined) return "";
++  if (!isString(raw.utmCampaign)) {
++    log.warn("sheets-append: lead " + lead.id + " has non-string utmCampaign, writing empty cell");
++    return "";
++  }
++  return raw.utmCampaign;
++}
++
+ export const sheetsAppend: Integration = {
+   name: "sheets-append",
+   requiredEnv: ["SHEETS_WEBHOOK_URL", "SHEETS_TOKEN"],
+@@ -24,7 +41,7 @@ export const sheetsAppend: Integration = {
+ 
+     const url = webhookUrl.value + "?token=" + token.value;
+     const response = await postJson(url, {
+-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
++      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, readCampaign(lead)]],
+     });
+     if (!response.ok) return response;
+ 
