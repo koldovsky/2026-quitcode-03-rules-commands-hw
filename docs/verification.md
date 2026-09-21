@@ -106,7 +106,27 @@
 
 ### `/generate-integration`
 
-_(заповнюється після прогону)_
+- Виклик: `/generate-integration Pipedrive` — нова сесія (Claude Code 2.1.20,
+  `claude-opus-4-5-20251101`). Спершу випадково без аргументу: `**Ціль:** ` порожня →
+  агент спитав, який сервіс, і зупинився (запасний рядок команди спрацював). Далі
+  `/generate-integration Pipedrive` → `**Ціль:** Pipedrive`.
+- Класифікував Pipedrive як систему обліку (CRM) → передає `name`, `email[]`, `phone[]`.
+- Які файли створено: `app/src/integrations/pipedrive-create.ts`,
+  `app/src/integrations/pipedrive-create.test.ts`; змінено `app/src/integrations/index.ts`
+  (імпорт + запис у масиві). Більше нічого (`git status --short`).
+- Самовиправлення: перша версія розбирала відповідь через `JSON.parse` → `check:rules`
+  показав `json-via-parse` → агент переписав на `parseJson` з guard.
+- `npm test`: 18 → 24 (6 нових: payload, дві відсутні змінні, успіх з URL / заголовком /
+  тілом, HTTP-помилка, `success=false`); `npm run typecheck` — без помилок;
+  `npm run check:rules`: TOTAL 1 → 1 (0 порушень у нових файлах), `core-untouched 0`,
+  `package.json` не змінено. Токен — у заголовку, а не в URL (правило `conventions`;
+  його grep-перевірка показує лише `sheets-append.ts`). Результат закомічено без змін —
+  `2c954b6`.
+- Чого агент не перевірив: авторизацію взяв з пам'яті — `Authorization: Bearer`,
+  позначивши це як припущення. За документацією Pipedrive персональний API-токен
+  передається в заголовку `x-api-token` («The API token must be provided in the
+  x-api-token header for all requests»), а `Bearer` — для OAuth. Виправив окремим
+  комітом `b9b978b`.
 
 ## Task E (бонус) — хук
 
