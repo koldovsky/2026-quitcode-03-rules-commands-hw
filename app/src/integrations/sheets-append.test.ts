@@ -41,4 +41,15 @@ describe("sheets-append", () => {
 
     await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: false, error: "sheets error: quota_exceeded" });
   });
+
+  it("не повторює запит, якщо таблиця відповіла помилкою: запис неідемпотентний", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn(async () => new Response("unavailable", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sheetsAppend.send(lead);
+
+    expect(result.ok).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

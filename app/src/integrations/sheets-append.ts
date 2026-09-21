@@ -27,7 +27,9 @@ const sheetsAppend: Integration = {
     const url = `${webhookUrl.value}?token=${token.value}`;
     const body = { values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]] };
 
-    const response = await postJson(url, body);
+    // Без повторів: запис неідемпотентний — повтор після 5xx чи таймауту, коли рядок уже
+    // додано, дав би дублікат.
+    const response = await postJson(url, body, { retries: 0 });
     if (!response.ok) {
       log.error(`sheets-append: lead ${lead.id} not delivered: ${response.error}`);
       return response;

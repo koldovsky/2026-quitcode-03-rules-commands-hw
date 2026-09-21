@@ -73,7 +73,7 @@ describe("pipedrive-create", () => {
     });
   });
 
-  it("повертає помилку, якщо Pipedrive API відповідає помилкою", async () => {
+  it("повертає помилку й не повторює запит, якщо Pipedrive API відповідає помилкою", async () => {
     vi.stubEnv("PIPEDRIVE_API_TOKEN", "fake-token-12345");
     vi.stubEnv("PIPEDRIVE_DOMAIN", "test-company");
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -86,6 +86,7 @@ describe("pipedrive-create", () => {
 
     expect(result.ok).toBe(false);
     expect(result).toHaveProperty("error");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("повертає помилку, якщо Pipedrive API повертає success=false", async () => {

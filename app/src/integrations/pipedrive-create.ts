@@ -40,8 +40,10 @@ export const pipedriveCreate: Integration = {
     const url = `https://${domainResult.value}.pipedrive.com/api/v1/persons`;
     const payload = buildPersonPayload(lead);
 
+    // Без повторів: створення контакту неідемпотентне — повтор після 5xx чи таймауту дав би дубль.
     const response = await postJson(url, payload, {
       headers: { "x-api-token": tokenResult.value },
+      retries: 0,
     });
 
     if (!response.ok) {
