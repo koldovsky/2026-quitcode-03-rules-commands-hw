@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 coverage/
+app/.vitest/
 .env
 .env.*
 !.env.example
@@ -10,3 +11,4 @@ CLAUDE.local.md
 .DS_Store
 nul
 repomix-output.xml
+.claude/settings.local.json

@@ -1,0 +1,57 @@
+--- a/app/src/core/types.ts
++++ b/app/src/core/types.ts
+@@ -9,6 +9,8 @@
+   phone?: string;
+   source: "website" | "instagram" | "referral";
+   budgetUsd?: number;
++  /** UTM-кампанія з форми сайту, напр. `spring_sale`. Може бути відсутня. */
++  utmCampaign?: string;
+   /** ISO-8601, UTC. */
+   createdAt: string;
+ }
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -23,7 +23,7 @@
+     const token = readEnv("SHEETS_TOKEN");
+     if (!token.ok) return token;
+ 
+-    const row = [lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source];
++    const row = [lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, lead.utmCampaign ?? ""];
+     const response = await postJson(`${webhookUrl.value}?token=${token.value}`, { values: [row] });
+     if (!response.ok) {
+       log.error(`sheets-append: lead ${lead.id} not delivered: ${response.error}`);
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -23,7 +23,7 @@
+ });
+ 
+ describe("sheets-append", () => {
+-  it("додає рядок у таблицю і повертає ok", async () => {
++  it("додає рядок у таблицю і повертає ok; без кампанії колонка порожня", async () => {
+     const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
+     vi.stubGlobal("fetch", fetchMock);
+ 
+@@ -32,10 +32,22 @@
+     const [url, init] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+     expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
+     });
+   });
+ 
++  it("пише utmCampaign окремою колонкою в кінці рядка", async () => {
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send({ ...lead, utmCampaign: "spring_sale" })).resolves.toEqual({ ok: true, value: undefined });
++
++    const [, init] = fetchMock.mock.calls[0]!;
++    expect(JSON.parse(String(init?.body))).toEqual({
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", "spring_sale"]],
++    });
++  });
++
+   it("повертає помилку, якщо таблиця відповіла не ok", async () => {
+     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"status":"quota_exceeded"}', { status: 200 })));
+ 

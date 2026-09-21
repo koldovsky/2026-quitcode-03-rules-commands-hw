@@ -1,0 +1,30 @@
+     × відсутній файл — це перший запуск, а не помилка 4ms
+     × читає збережений стан 2ms
+     × порожній файл після обриву запису — це помилка, а не дата 1970 2ms
+     × обрізаний JSON — теж помилка 1ms
+     × валідний JSON неочікуваної форми не приймається мовчки 1ms
+     × зберігає стан і не лишає тимчасового файлу 1ms
+     × невдалий запис повертає помилку, а не кидає виняток 1ms
+     × невдалий запис лишає попередній стан цілим 0ms
+     × не розсилає нічого, якщо стан не читається 4ms
+     × не затирає пошкоджений стан «початковим» — файл лишається для розбору людиною 2ms
+     × зберігає прогрес після кожного ліда, а не лише в кінці 2ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/sync/run.test.ts > runSync > не розсилає нічого, якщо стан не читається
+AssertionError: expected [ 'ld_0001', 'ld_0002', 'ld_0003' ] to deeply equal []
+ FAIL  src/sync/run.test.ts > runSync > не затирає пошкоджений стан «початковим» — файл лишається для розбору людиною
+AssertionError: expected '{\n  "lastSyncedAt": "2026-09-10T08:0…' to be 'не json' // Object.is equality
+ FAIL  src/sync/run.test.ts > runSync > зберігає прогрес після кожного ліда, а не лише в кінці
+AssertionError: expected { Object (lastSyncedAt) } to deeply equal { Object (lastSyncedAt) }
+ FAIL  src/sync/state.test.ts > loadState > відсутній файл — це перший запуск, а не помилка
+AssertionError: expected { Object (lastSyncedAt) } to deeply equal { ok: true, value: undefined }
+ FAIL  src/sync/state.test.ts > loadState > читає збережений стан
+AssertionError: expected { Object (lastSyncedAt) } to deeply equal { ok: true, …(1) }
+ FAIL  src/sync/state.test.ts > loadState > порожній файл після обриву запису — це помилка, а не дата 1970
+AssertionError: expected undefined to be false // Object.is equality
+ FAIL  src/sync/state.test.ts > loadState > обрізаний JSON — теж помилка
+AssertionError: expected undefined to be false // Object.is equality
+ FAIL  src/sync/state.test.ts > loadState > валідний JSON неочікуваної форми не приймається мовчки
+AssertionError: expected undefined to be false // Object.is equality
+ FAIL  src/sync/state.test.ts > saveState > зберігає стан і не лишає тимчасового файлу
+AssertionError: expected undefined to deeply equal { ok: true, value: undefined }

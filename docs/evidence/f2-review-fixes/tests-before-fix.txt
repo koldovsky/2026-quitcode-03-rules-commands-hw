@@ -1,0 +1,76 @@
+# Тести другого рев'ю CodeRabbit проти коду ДО фікса
+
+Команда:  cd app && npm test -- src/sync
+Код:      app/src/sync/{run,state}.ts з коміту a4e294b (той, що рев'ювався)
+Тести:    нові, з цього коміту
+
+ RUN  v5.0.0 <repo>/app
+ ❯ src/sync/state.test.ts (15 tests | 6 failed) 12ms
+   ❯ loadState (12)
+     × відхиляє стан: порожній рядок 3ms
+     × відхиляє стан: не дата 1ms
+     × відхиляє стан: без часу 0ms
+     × відхиляє стан: без мілісекунд 1ms
+     × відхиляє стан: неіснуюча дата 1ms
+     × відхиляє стан: інший тип lastLeadId 0ms
+stderr | src/sync/run.test.ts > runSync > не розсилає нічого, якщо стан не читається
+2026-09-21T16:50:51.261Z ERROR sync: стан не прочитано (sync-state: invalid JSON); розсилку зупинено, потрібне втручання людини
+ ❯ src/sync/run.test.ts (7 tests | 5 failed) 18ms
+   ❯ runSync (7)
+     × при першому запуску розсилає всі ліди і зберігає найновішу дату 11ms
+     × не розсилає нічого, якщо стан не читається 1ms
+     × зберігає прогрес після кожного ліда, а не лише в кінці 2ms
+     × не губить лід із таким самим createdAt після обриву 1ms
+     × повертає помилку, якщо чекпойнт не зберігся після доставки 1ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/sync/run.test.ts > runSync > при першому запуску розсилає всі ліди і зберігає найновішу дату
+AssertionError: expected { Object (pending, delivered, ...) } to deeply equal { ok: true, …(1) }
+- Expected
++ Received
+  {
+-   "ok": true,
+-   "value": {
+    "delivered": 3,
+    "failed": 0,
+    "pending": 3,
+-   },
+  }
+ ❯ src/sync/run.test.ts:52:20
+     50|     const result = await runSync(leads, [recordingIntegration(sent)], …
+     51|
+     52|     expect(result).toEqual({ ok: true, value: { pending: 3, delivered:…
+       |                    ^
+     53|     expect(JSON.parse(readFileSync(statePath, "utf8"))).toEqual({
+     54|       lastSyncedAt: "2026-09-10T08:00:00.000Z",
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+ FAIL  src/sync/run.test.ts > runSync > не розсилає нічого, якщо стан не читається
+AssertionError: expected undefined to be false // Object.is equality
+- Expected:
+false
++ Received:
+undefined
+ ❯ src/sync/run.test.ts:79:23
+     77|
+     78|     expect(sent).toEqual([]);
+     79|     expect(result.ok).toBe(false);
+       |                       ^
+     80|     if (!result.ok) expect(result.error).toContain("стан не прочитано"…
+     81|   });
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+ FAIL  src/sync/run.test.ts > runSync > зберігає прогрес після кожного ліда, а не лише в кінці
+AssertionError: expected { Object (lastSyncedAt) } to deeply equal { …(2) }
+- Expected
++ Received
+  {
+-   "lastLeadId": "ld_0002",
+    "lastSyncedAt": "2026-09-09T11:00:00.000Z",
+  }
+ ❯ src/sync/run.test.ts:107:57
+    105|     await expect(runSync(leads, [killed], statePath)).rejects.toThrow(…
+    106|
+    107|     expect(JSON.parse(readFileSync(statePath, "utf8"))).toEqual({
+       |                                                         ^
+    108|       lastSyncedAt: "2026-09-09T11:00:00.000Z",
+    109|       lastLeadId: "ld_0002",
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+ FAIL  src/sync/run.test.ts > runSync > не губить лід із таким самим createdAt після обриву

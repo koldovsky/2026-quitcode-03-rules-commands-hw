@@ -6,6 +6,15 @@ Agentic AI"** course.
 > Workshop 3: **Правила та команди: керована поведінка AI**
 > Автор: В'ячеслав Колдовський — Dev AI Consulting (dev-ai.dev)
 
+---
+
+> 🧭 **Рев'ювер цієї домашки — почніть звідси: [`docs/reviewer-map.md`](docs/reviewer-map.md).**
+> Одна команда (`bash tools/verify-all.sh`) перевіряє всі числа, далі — чотири
+> файли, що показують суть, і таблиця «пункт рубрики → де доказ».
+> Здав: **Hryhorii Haponiuk**.
+
+---
+
 WS2 ended with "permissions beat rules". WS3 makes rules actually work: project
 rules in the Claude Code and Cursor formats, `AGENTS.md` as a cross-tool baseline,
 commands as an API to the agent — and an A/B run that shows, with numbers, whether
