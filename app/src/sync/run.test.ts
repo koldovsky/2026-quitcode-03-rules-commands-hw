@@ -62,4 +62,17 @@ describe("runSync", () => {
 
     expect(sent).toEqual(["ld_0002", "ld_0003"]);
   });
+
+  it("нічого не розсилає, якщо файл стану пошкоджений, і пише помилку в журнал", async () => {
+    const sent: string[] = [];
+    const statePath = join(dir, "sync-state.json");
+    writeFileSync(statePath, ""); // так лишає файл обірваний запис на повному диску
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const report = await runSync(leads, [recordingIntegration(sent)], statePath);
+
+    expect(sent).toEqual([]);
+    expect(report).toEqual({ pending: 0, delivered: 0, failed: 0 });
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining("sync state: invalid JSON"));
+  });
 });
