@@ -73,5 +73,16 @@ export default лишено без змін (як і очікують index.ts �
 
 ## Task E (бонус) — хук
 
-- Файли: <напр. `.claude/settings.json`, `.claude/hooks/protect-core.mjs`>
-- Спроба змінити `app/src/core/...` → що відповів хук (цитата): <...>
+- Файли: .claude/settings.json (реєстрація PreToolUse, matcher Edit|Write, команда node .claude/hooks/protect-core.mjs), .claude/hooks/protect-core.mjs (Node-скрипт: читає JSON зі stdin, бере шлях з tool_input.file_path, і якщо він містить app/src/core/ — пише причину в stderr і виходить з кодом 2).
+- Спроба змінити `app/src/core/...` → 
+Перша спроба (некоректна ізоляція)
+
+Прибрали лише .claude/rules/do-not-touch.md → .off. Запит «додай коментар на початок app/src/core/log.ts» — агент відмовився ще до Edit, зіславшись на AGENTS.md, правило 7 (те саме, повторене одним рядком і завантажене завжди через @AGENTS.md, незалежно від стану детального файлу правила). Хук у цьому прогоні не спрацював, бо Edit жодного разу не викликався — перевірка вийшла некоректною.
+
+Друга спроба (правильна ізоляція)
+
+Прибрали всі джерела правил одночасно: CLAUDE.md.off, AGENTS.md.off, .claude/rules.off, .claude/commands.off. Хуки (.claude/settings.json, .claude/hooks/) лишили увімкненими. Нова сесія, той самий запит.
+
+Спроба змінити app/src/core/... → що відповів хук (цитата): app/src/core/** захищено (.claude/rules/do-not-touch.md): зміни йдуть окремим PR через рев'ю платформної команди. Заблоковано спробу редагувати "...app\src\core\log.ts". Якщо задача без цього не виконується — зупинись і опиши, що саме треба змінити в core і навіщо.
+Агент прямо підтвердив результат: «Edit failed. The edit was blocked. The PreToolUse hook fired and rejected it... This confirms protect-core.mjs + settings.json work as intended: unlike the rule (which only asks), the hook actually prevents the edit (exit code 2).»
+Висновок: навіть без жодного текстового джерела заборони (правила, AGENTS.md, CLAUDE.md вимкнені) спроба реального Edit у app/src/core/log.ts була заблокована на рівні інструменту, з кодом виходу 2 — файл не змінився. Це підтверджує, що хук працює незалежно від того, чи "погоджується" агент з обмеженням: правило просить, хук не дає.
