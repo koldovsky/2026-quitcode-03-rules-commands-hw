@@ -95,9 +95,8 @@ git checkout -- app
 git clean -fd app
 
 # 4. ПРОГІН A — повернути правила, базу і команди
-node docs/ab/toggle-rules.mjs on
-#    хук лишити на .off до кінця прогону A:
-mv .claude/settings.json .claude/settings.json.off
+node docs/ab/toggle-rules.mjs on-ab
+#    (режим on-ab навмисно лишає хук вимкненим)
 #    → відкрити НОВУ сесію, той самий запит, та сама відповідь на уточнення
 
 # 5. зафіксувати результат A
@@ -108,7 +107,7 @@ git add -N app && git diff --output=docs/ab/a-rules-on.diff -- app
 
 # 6. прибрати за собою
 git reset -q && git checkout -- app && git clean -fd app
-mv .claude/settings.json.off .claude/settings.json
+node docs/ab/toggle-rules.mjs on          # повернути хук
 node docs/ab/toggle-rules.mjs status     # усе «УВІМКНЕНО»
 ```
 
