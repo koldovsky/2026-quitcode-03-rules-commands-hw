@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-// PreToolUse-хук: не дає змінити app/src/core/** і перегенерувати core.lock.json.
+// PreToolUse-хук: не дає змінити app/src/core/** і app/scripts/** та перегенерувати core.lock.json.
 // Claude Code передає JSON на stdin; код виходу 2 блокує дію, stderr отримує агент.
 import { readFileSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { resolve } from "node:path";
 
-// Сегмент шляху, а не префікс від кореня проєкту: так ловимо й копії репо (git worktree).
-const PROTECTED_SEGMENT = "/app/src/core/";
+// Сегменти шляху, а не префікси від кореня проєкту: так ловимо й копії репо (git worktree).
+const PROTECTED = [
+  ["/app/src/core/", "app/src/core/**"],
+  ["/app/scripts/", "app/scripts/**"],
+];
 // Запуск перевірки з --write-lock у межах однієї команди, а не будь-яка згадка прапорця
 // (інакше блокується, наприклад, коміт, у повідомленні якого є ця назва).
 const REGENERATE_LOCK = /check[-:]rules(?:\.mjs)?\b[^|;&\n]*--write-lock/;
@@ -34,8 +37,10 @@ const target = input?.tool_input?.file_path ?? input?.tool_input?.notebook_path;
 if (typeof target !== "string" || target === "") process.exit(0);
 
 const base = input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
-let path = `${(isAbsolute(target) ? target : resolve(base, target)).replaceAll("\\", "/")}/`;
+// resolve нормалізує й абсолютні шляхи: «…/integrations/../core/log.ts» → «…/core/log.ts».
+let path = `${resolve(base, target).replaceAll("\\", "/")}/`;
 if (process.platform !== "linux") path = path.toLowerCase(); // macOS і Windows нечутливі до регістру
 
-if (path.includes(PROTECTED_SEGMENT)) block(`заблоковано зміну ${target}: app/src/core/** — захищена зона.`);
+const zone = PROTECTED.find(([segment]) => path.includes(segment));
+if (zone) block(`заблоковано зміну ${target}: ${zone[1]} — захищена зона.`);
 process.exit(0);
