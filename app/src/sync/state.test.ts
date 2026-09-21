@@ -28,9 +28,17 @@ describe("loadState", () => {
     expect(loadState(statePath)).toEqual({ ok: false, error: "sync state: invalid JSON" });
   });
 
-  it("повертає помилку, якщо дата в стані не дата", () => {
-    writeFileSync(statePath, JSON.stringify({ lastSyncedAt: "" }));
-    expect(loadState(statePath)).toEqual({ ok: false, error: "sync state: unexpected shape" });
+  it.each(["", "3", "2026-9-9", "Tue Sep 10 2026", "2026-02-30T00:00:00.000Z", "2026-09-10T08:00:00"])(
+    "повертає помилку, якщо дата в стані не ISO-8601 UTC: %j",
+    (lastSyncedAt) => {
+      writeFileSync(statePath, JSON.stringify({ lastSyncedAt }));
+      expect(loadState(statePath)).toEqual({ ok: false, error: "sync state: unexpected shape" });
+    },
+  );
+
+  it("приймає ISO-8601 UTC і без мілісекунд", () => {
+    writeFileSync(statePath, JSON.stringify({ lastSyncedAt: "2026-09-10T08:00:00Z" }));
+    expect(loadState(statePath)).toEqual({ ok: true, value: { lastSyncedAt: "2026-09-10T08:00:00Z" } });
   });
 });
 

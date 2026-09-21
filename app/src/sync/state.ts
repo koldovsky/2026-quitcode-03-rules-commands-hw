@@ -11,8 +11,19 @@ export interface SyncState {
 
 const INITIAL_STATE: SyncState = { lastSyncedAt: "1970-01-01T00:00:00.000Z" };
 
+// Лише формат, який пишемо самі: `runSync` порівнює дати як рядки, тож «3» чи
+// «Tue Sep 10 2026» мовчки пропустили б усі ліди.
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+
+const isIsoUtc = (value: string): boolean => {
+  if (!ISO_UTC.test(value)) return false;
+  const time = Date.parse(value);
+  // Date.parse переносить неіснуючі дати (2026-02-30 → 2 березня) — такі відкидаємо.
+  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 19) === value.slice(0, 19);
+};
+
 const isSyncState = (value: unknown): value is SyncState =>
-  isRecord(value) && isString(value.lastSyncedAt) && !Number.isNaN(Date.parse(value.lastSyncedAt));
+  isRecord(value) && isString(value.lastSyncedAt) && isIsoUtc(value.lastSyncedAt);
 
 const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
