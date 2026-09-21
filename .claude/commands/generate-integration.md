@@ -23,10 +23,11 @@ disable-model-invocation: true
    `app/src/integrations/index.ts`, `app/src/core/types.ts` і сигнатури в
    `app/src/core/http.ts`, `config.ts`, `parse.ts`, `log.ts` — підтягнуться правила
    `architecture` і `conventions`.
-4. Визнач виклик API сервісу: метод, URL, заголовки, тіло, ознаку успіху у відповіді.
-   Бери з документації сервісу; не впевнений у деталі — винеси її в змінну середовища
-   й познач у підсумку. Сервісу потрібне те, чого немає в API ядра (не-POST запит,
-   OAuth-обмін, нове поле `Lead`), — зупинись за правилом `do-not-touch`.
+4. Визнач виклик API сервісу: метод, URL, заголовки (секрети — лише в них, правило
+   `conventions`), тіло, ознаку успіху у відповіді. Бери з документації сервісу; не
+   впевнений у деталі — винеси її в змінну середовища й познач у підсумку. Сервісу
+   потрібне те, чого немає в API ядра (не-POST запит, OAuth-обмін, нове поле `Lead`), —
+   зупинись за правилом `do-not-touch`.
 5. Створи `app/src/integrations/<kebab-name>.ts` — об'єкт типу `Integration` за
    правилами `architecture` і `conventions`.
 6. Створи `app/src/integrations/<kebab-name>.test.ts` — кейси з правила `conventions`
@@ -45,6 +46,7 @@ disable-model-invocation: true
       нічого.
 - [ ] `name` = ім'я файлу без `.ts`; модуль типізований як `Integration`; `send()`
       повертає `Result` і не кидає винятків.
+- [ ] Секрети — у заголовках, не в URL (правило `conventions`).
 - [ ] Є тести з кроку 6; `npm test` зелений; `npm run typecheck` без помилок.
 - [ ] `check:rules`: 0 порушень у нових файлах, TOTAL не більший за базовий,
       `core-untouched 0`; `package.json` не змінено.

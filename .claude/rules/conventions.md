@@ -21,6 +21,9 @@ paths:
   `axios` / `got` / `ky`, не `node:http(s)`.
 - **Змінні середовища** — лише `readEnv(name)` з `core/config.ts`, імена — у `requiredEnv`.
   Не `process.env`. Секрети не логуй і не вшивай у код, навіть «тимчасово».
+- **Секрети — у заголовках, не в URL:** `postJson(url, body, { headers })`. `postJson`
+  пише URL у журнал при кожній невдалій спробі, а `redact` маскує лише відомі шаблони.
+  Наявний `?token=` у `sheets-append` — контракт вебхука, і його `redact` маскує.
 - **Зовнішній JSON** (відповідь API, вебхук, файл стану) — лише
   `parseJson(text, guard, label)` з `core/parse.ts` з guard на очікувану форму. Не
   `JSON.parse`. Невалідний JSON чи неочікувана форма → `{ ok: false, … }`, видимий у
@@ -49,5 +52,7 @@ paths:
 - `cd app && npm test && npm run typecheck` → тести зелені, помилок типів немає.
 - `grep -rnw --include="*.ts" --exclude="*.test.ts" "throw" app/src/integrations app/src/sync`
   → порожньо.
+- `grep -rnE --include="*.ts" --exclude="*.test.ts" "[?&][A-Za-z_]*(token|key)=" app/src/integrations`
+  → лише `sheets-append.ts`.
 - Сповіщення: у тесті модуля фікстура має і `email`, і `phone`, а асерти перевіряють,
   що в тексті немає жодного з них (`not.toContain(lead.email)`, `not.toContain(...)` для телефону).
