@@ -46,7 +46,7 @@ describe("pipedrive-create", () => {
     });
   });
 
-  it("надсилає дані ліда в Pipedrive API з Bearer token у заголовку", async () => {
+  it("надсилає дані ліда в Pipedrive API з токеном у заголовку x-api-token", async () => {
     vi.stubEnv("PIPEDRIVE_API_TOKEN", "fake-token-12345");
     vi.stubEnv("PIPEDRIVE_DOMAIN", "test-company");
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -63,7 +63,7 @@ describe("pipedrive-create", () => {
 
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://test-company.pipedrive.com/api/v1/persons");
-    expect(init?.headers).toMatchObject({ Authorization: "Bearer fake-token-12345" });
+    expect(init?.headers).toMatchObject({ "x-api-token": "fake-token-12345" });
 
     const body = JSON.parse(String(init?.body));
     expect(body).toEqual({

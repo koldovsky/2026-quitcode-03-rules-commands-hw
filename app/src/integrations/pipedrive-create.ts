@@ -41,7 +41,7 @@ export const pipedriveCreate: Integration = {
     const payload = buildPersonPayload(lead);
 
     const response = await postJson(url, payload, {
-      headers: { Authorization: `Bearer ${tokenResult.value}` },
+      headers: { "x-api-token": tokenResult.value },
     });
 
     if (!response.ok) {
