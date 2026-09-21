@@ -1,0 +1,71 @@
+diff --git a/app/src/core/types.ts b/app/src/core/types.ts
+index 72303a0..bb1815d 100644
+--- a/app/src/core/types.ts
++++ b/app/src/core/types.ts
+@@ -8,6 +8,8 @@ export interface Lead {
+   email: string;
+   phone?: string;
+   source: "website" | "instagram" | "referral";
++  /** Рекламна кампанія з форми сайту (utm_campaign). Може бути відсутньою. */
++  utmCampaign?: string;
+   budgetUsd?: number;
+   /** ISO-8601, UTC. */
+   createdAt: string;
+diff --git a/app/src/integrations/sheets-append.test.ts b/app/src/integrations/sheets-append.test.ts
+index 12e42ce..849cc95 100644
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -32,7 +32,31 @@ describe("sheets-append", () => {
+     const [url, init] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+     expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
++    });
++  });
++
++  it("пише кампанію лідa останньою колонкою рядка", async () => {
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send({ ...lead, utmCampaign: "spring_sale_2026" })).resolves.toEqual({
++      ok: true,
++      value: undefined,
++    });
++
++    const [, init] = fetchMock.mock.calls[0]!;
++    expect(JSON.parse(String(init?.body))).toEqual({
++      values: [
++        [
++          "2026-09-10T09:30:00.000Z",
++          "Андрій Тестовий",
++          "andrii@studio-nova.example.test",
++          "",
++          "instagram",
++          "spring_sale_2026",
++        ],
++      ],
+     });
+   });
+ 
+diff --git a/app/src/integrations/sheets-append.ts b/app/src/integrations/sheets-append.ts
+index 821ba22..73e7ae1 100644
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -26,7 +26,15 @@ const sheetsAppend: Integration = {
+     if (!token.ok) return token;
+ 
+     const url = `${webhookUrl.value}?token=${token.value}`;
+-    const row = [lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source];
++    // Кампанія — остання колонка: нові поля додаються в кінець рядка, щоб не зсувати наявні.
++    const row = [
++      lead.createdAt,
++      lead.name,
++      lead.email,
++      lead.phone ?? "",
++      lead.source,
++      lead.utmCampaign ?? "",
++    ];
+ 
+     const response = await postJson(url, { values: [row] });
+     if (!response.ok) {
