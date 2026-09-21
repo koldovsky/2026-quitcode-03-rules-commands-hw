@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { log } from "../core/log.js";
 import type { Lead } from "../core/types.js";
 import sheetsAppend from "./sheets-append.js";
 
@@ -34,6 +35,18 @@ describe("sheets-append", () => {
     expect(JSON.parse(String(init?.body))).toEqual({
       values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
     });
+  });
+
+  // Append не ідемпотентний: повтор після втраченої відповіді дав би дубль рядка.
+  it("не повторює запит після збою — одна спроба", async () => {
+    vi.spyOn(log, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn(async () => new Response("upstream down", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sheetsAppend.send(lead);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(false);
   });
 
   it("повертає помилку, якщо таблиця відповіла не ok", async () => {
