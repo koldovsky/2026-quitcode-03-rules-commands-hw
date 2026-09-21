@@ -12,9 +12,9 @@
 | Команда | Навіщо |
 |---|---|
 | `npm install` | встановлення (лише devDependencies) |
-| `npm test` | Vitest, без мережі. Базова лінія — 18 тестів зелені |
+| `npm test` | Vitest, без мережі. Зараз — 22 тести зелені |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run check:rules` | статична перевірка конвенцій. Базова лінія спадкового коду — `TOTAL: 8` |
+| `npm run check:rules` | статична перевірка конвенцій. Зараз — `TOTAL: 1` (лишився `json-via-parse` у `src/sync/state.ts`) |
 
 ## Карта проєкту
 
@@ -52,5 +52,5 @@
 cd app && npm test && npm run typecheck && npm run check:rules
 ```
 
-Зелені тести, чистий typecheck, `check:rules` не більше за базову лінію (`TOTAL: 8`)
+Зелені тести, чистий typecheck, `check:rules` не більше за поточне число (`TOTAL: 1`)
 і `core-untouched 0`. Далі `git status --short` — у списку немає захищених шляхів.
