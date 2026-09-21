@@ -53,7 +53,9 @@ paths:
 
 - `cd app && npm run check:rules` → `0` у рядках `http-via-core`, `env-via-config`,
   `json-via-parse`, `log-via-logger`, `core-untouched`.
-- `grep -rn "from \"\.\./sync\|from \"\./sync" app/src/integrations app/src/core` —
-  порожній вивід; `grep -rn "integrations/" app/src/core` — порожній вивід.
+- Напрям залежностей — три `grep` із теки `app`, усі мають дати порожній вивід:
+  `grep -rnE 'from "[^"]*(integrations|sync)/' src/core`,
+  `grep -rnE 'from "[^"]*sync/' src/integrations`,
+  `grep -rnE 'from "[^"]*integrations/' src/sync` (реєстр підключає `worker.ts`, не `sync/`).
 - Нова інтеграція: `git status --short` показує рівно два нові файли в
   `app/src/integrations/` і змінений `index.ts`.
