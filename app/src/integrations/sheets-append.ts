@@ -44,7 +44,7 @@ const sheetsAppend: Integration = {
       return { ok: false, error: `sheets error: ${parsed.value.status}` };
     }
 
-    log.info(`sheets-append: lead ${lead.id} row added`);
+    log.info(`sheets-append: row added for lead ${lead.id}`);
     return { ok: true, value: undefined };
   },
 };
