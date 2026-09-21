@@ -81,7 +81,28 @@
 
 ### `/refactor`
 
-_(заповнюється після прогону)_
+- Виклик: `/refactor app/src/integrations/sheets-append.ts` — нова сесія (Claude Code
+  2.1.20, `claude-opus-4-5-20251101`); `$ARGUMENTS` підставився
+  (`**Ціль:** app/src/integrations/sheets-append.ts`).
+- `npm run check:rules` для цього файлу: до **7** (`no-any` ×2, `http-via-core`,
+  `env-via-config`, `json-via-parse`, `log-via-logger` ×2) → після **0**; TOTAL 8 → 1
+  (лишився `sync/state.ts:14`, `json-via-parse`).
+- `npm test` до / після: 18/18 → 18/18; `npm run typecheck` — без помилок до і після.
+  Ті самі числа отримав, перезапустивши перевірки сам.
+- Хід: базовий стан → прочитав ціль, її тест, реєстр, `slack-notify.ts` і API ядра →
+  один `Edit` цільового файлу → ті самі перевірки → `git status` / `git diff --stat`
+  (21 виклик інструментів). Змінено лише `sheets-append.ts`, тести не чіпав, не комітив.
+  Результат закомічено без змін — `194a125`.
+- Що змінилось у поведінці: з того, що фіксують тести, — нічого (default-експорт,
+  `name`, `requiredEnv`, URL з `?token=`, тіло `values`, текст `sheets error: <status>`).
+  Поза тестами агент сам перелічив: повтори й таймаут `postJson`; помилка на не-2xx
+  замість розбору тіла; невалідний JSON чи форма → `Result` замість винятку; відсутня
+  змінна → `missing environment variable …` замість URL `undefined?token=undefined`;
+  журнал через `log` із маскуванням (старий `console.log` друкував URL разом із токеном).
+- Чого агент не помітив: змінився текст успішного запису в журналі —
+  `row added for lead <id>` → `lead <id> row added`. Саме старий формат видно в
+  продакшн-логах (`materials/error-log.txt`), тож пошук і алерти за ним зламались би.
+  Повернув старий текст окремим комітом `b8ec0c8`.
 
 ### `/generate-integration`
 
