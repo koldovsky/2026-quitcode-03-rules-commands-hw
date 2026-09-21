@@ -1,0 +1,52 @@
+diff --git a/app/src/core/types.ts b/app/src/core/types.ts
+index 72303a0..597c9d5 100644
+--- a/app/src/core/types.ts
++++ b/app/src/core/types.ts
+@@ -9,6 +9,8 @@ export interface Lead {
+   phone?: string;
+   source: "website" | "instagram" | "referral";
+   budgetUsd?: number;
++  /** UTM-мітка рекламної кампанії, з якої прийшов лід (може бути відсутня). */
++  utmCampaign?: string;
+   /** ISO-8601, UTC. */
+   createdAt: string;
+ }
+diff --git a/app/src/integrations/sheets-append.test.ts b/app/src/integrations/sheets-append.test.ts
+index 12e42ce..7b12801 100644
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -32,7 +32,20 @@ describe("sheets-append", () => {
+     const [url, init] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+     expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
++    });
++  });
++
++  it("додає utmCampaign окремою колонкою в кінці рядка, якщо вона є", async () => {
++    const leadWithCampaign: Lead = { ...lead, utmCampaign: "autumn_sale" };
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send(leadWithCampaign)).resolves.toEqual({ ok: true, value: undefined });
++
++    const [, init] = fetchMock.mock.calls[0]!;
++    expect(JSON.parse(String(init?.body))).toEqual({
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", "autumn_sale"]],
+     });
+   });
+ 
+diff --git a/app/src/integrations/sheets-append.ts b/app/src/integrations/sheets-append.ts
+index a97f4c2..13586a4 100644
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -23,7 +23,7 @@ const sheetsAppend: Integration = {
+ 
+     const url = `${webhookUrl.value}?token=${token.value}`;
+     const response = await postJson(url, {
+-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
++      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, lead.utmCampaign ?? ""]],
+     });
+     if (!response.ok) return response;
+ 
