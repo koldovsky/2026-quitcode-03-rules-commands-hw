@@ -51,7 +51,7 @@ paths:
 
 - `cd app && npm test && npm run typecheck && npm run check:rules`.
 - `check:rules` не додає порушень у рядках `http-via-core`, `env-via-config`,
-  `json-via-parse`, `log-via-logger`, `no-any`, `no-new-deps` порівняно з базовою
-  лінією (`TOTAL: 8` на старті) — а в ідеалі зменшує їх.
+  `json-via-parse`, `log-via-logger`, `no-any`, `no-new-deps`: порівнюй `TOTAL` із
+  числом, яке ти зафіксував **до** змін, — воно не має рости, а в ідеалі меншає.
 - `git diff app/package.json` не показує нового блоку `dependencies`.
 - У діфі сповіщень немає полів `email` і `phone`.
