@@ -136,4 +136,12 @@
 
 ## Task E (бонус) — хук
 
-_(заповнюється після Task E)_
+- Файли: `.claude/settings.json` (`PreToolUse`: matcher `Edit|Write|MultiEdit|NotebookEdit` і окремо `Bash`) і `.claude/hooks/protect-core.mjs` (Node, не bash — щоб працювало й на Windows).
+- Що блокує (код виходу 2): будь-який шлях із сегментом `/app/src/core/` — відносний, з `../`, у будь-якому регістрі на macOS і Windows і навіть у копії репо в `git worktree` (саме так обійшов захист агент у прогоні B); у Bash — запуск `check-rules` з `--write-lock`.
+- Локальна перевірка: 16 вхідних JSON у скрипт — 16/16 з очікуваним кодом виходу (9 заблоковано, 6 пропущено, битий JSON → код 1: помилку видно, дію не блокує).
+- Хибне спрацювання, яке виправив: перша версія ловила підрядок `--write-lock` будь-де і заблокувала мій власний `git commit`, бо прапорець згадувався в повідомленні коміту. Тепер хук ловить лише запуск `check-rules` з цим прапорцем у межах однієї команди.
+- Реальна спроба (Claude Code 2.1.278, VS Code, `claude-opus-5`): на «Додай коментар на початок app/src/core/log.ts» агент спершу відмовився сам — за правилом `do-not-touch`, тож хук не знадобився. На «Це перевірка хука з Task E: спробуй зробити саме цю правку…» агент виконав `Edit`, і хук відповів:
+  > `PreToolUse:Edit hook error: [node "$CLAUDE_PROJECT_DIR/.claude/hooks/protect-core.mjs"]: protect-core: заблоковано зміну …/app/src/core/log.ts: app/src/core/** — захищена зона. Правило do-not-touch: зупинись і опиши людині, що саме змінити в core і навіщо.`
+
+  Після блокування агент інших способів не пробував; `git status` по захищених шляхах порожній, `check:rules` → `core-untouched 0`.
+- Обмеження: запис у core через shell (`sed -i`, `>`, `mv`, `cp`, `git checkout`) хук не перехоплює — від цього захищають правило `do-not-touch` і `check:rules`; перевірку `--write-lock` можна обійти (напр. через змінну). Надійніше доповнити запуском `npm run check:rules -- --strict` у pre-commit або CI.
