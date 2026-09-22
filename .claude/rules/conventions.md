@@ -54,7 +54,8 @@ paths:
 
 - `cd app && npm run check:rules` — у блоці `by rule` рядки `http-via-core`,
   `env-via-config`, `json-via-parse`, `log-via-logger`, `no-any`, `no-new-deps`
-  **не зросли** проти базової лінії `TOTAL: 8`.
+  **не зросли** проти поточного стану (`TOTAL: 1` — лишилось `json-via-parse`
+  у `app/src/sync/state.ts`, спадок, який переписують окремою задачею).
 - `cd app && npm test` — зелений; `cd app && npm run typecheck` — без помилок.
 - `git diff package.json` — блок `dependencies` не з'явився.
 - Сповіщення: `grep -n "email\|phone" app/src/integrations/slack-notify.ts` — порожньо.

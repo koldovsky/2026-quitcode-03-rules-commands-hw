@@ -12,9 +12,9 @@
 | Команда | Для чого |
 |---|---|
 | `npm install` | встановити залежності (тільки dev) |
-| `npm test` | Vitest, один прогін — базова лінія 18 тестів |
+| `npm test` | Vitest, один прогін — зараз 22 тести |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run check:rules` | статична перевірка конвенцій — базова лінія `TOTAL: 8` |
+| `npm run check:rules` | статична перевірка конвенцій — зараз `TOTAL: 1` |
 
 ## Карта коду
 
@@ -49,6 +49,6 @@
 cd app && npm test && npm run typecheck && npm run check:rules
 ```
 
-Зелені тести; `check:rules` не вище базової лінії `TOTAL: 8`, рядок
+Зелені тести; `check:rules` не вище поточного `TOTAL: 1`, рядок
 `core-untouched` дорівнює `0`; `git status --short` не показує жодного шляху
 із захищених зон.
