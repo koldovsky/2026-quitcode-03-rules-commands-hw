@@ -25,8 +25,8 @@ npm run check:rules   # static check of the rules below
 - Do not edit `app/src/core/**`, `app/scripts/**`, `materials/**` — see `.claude/rules/do-not-touch.md`.
 - Layers, dependency direction, and the core's public API — see `.claude/rules/architecture.md`.
 - `Result` instead of exceptions; `postJson`/`readEnv`/`parseJson`+guard/`log`; no `any`; no new dependencies — see `.claude/rules/conventions.md`.
-- Notifications (Slack) — no lead email or phone.
-- File names are kebab-case; an integration's `name` field matches its file name.
+- Notifications (Slack) — no lead email or phone — see `.claude/rules/conventions.md`.
+- File names are kebab-case; an integration's `name` field matches its file name — see `.claude/rules/conventions.md`.
 
 ## Before committing
 

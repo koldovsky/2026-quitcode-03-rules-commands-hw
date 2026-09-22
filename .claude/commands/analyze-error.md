@@ -21,11 +21,19 @@ command name. Not there either — ask and stop.)
    Explicitly ask yourself: "if only the trigger were removed (e.g. free up the
    disk) — would the incident recur?" If the answer is "yes" — dig deeper, into the
    code, not the infrastructure.
-4. Find the cause in the project's code (`app/src/`): a specific file and line, and
+4. If the log shows a mass resend/duplicate pattern, pin down exactly which record
+   the resend restarts from and compare it against the timeline right before the
+   incident. "Restarts from wherever it last got stuck" (an amplifier — progress
+   simply didn't advance during one run) is a different defect than "restarts from
+   the very first record in the whole dataset" (state was fully reset — e.g. a
+   silent fallback to an initial/epoch value on a read or parse failure). Don't
+   stop at the first plausible mechanism you find — check which one the log
+   evidence actually supports.
+5. Find the cause in the project's code (`app/src/`): a specific file and line, and
    the mechanism — exactly how the code misbehaves under these conditions.
-5. Propose a test that reproduces the problem (fails on the current code, no real
+6. Propose a test that reproduces the problem (fails on the current code, no real
    network — per `.claude/rules/conventions.md`).
-6. Summarize for the human: trigger → root cause (file:line) → mechanism →
+7. Summarize for the human: trigger → root cause (file:line) → mechanism →
    proposed test. If there are obvious "amplifiers" of the problem, name them
    separately.
 

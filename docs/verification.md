@@ -45,37 +45,54 @@
 - **Trigger:** `ENOSPC` — a nightly backup filled the `/srv/lead-sync/data` disk
   (97% → 100%), `saveState()` failed to write at `00:05` and `00:10`; disk freed at
   `00:13:48`.
-- **Root cause (file:line, mechanism):** `app/src/sync/run.ts:36` — `saveState()`
-  with the new `lastSyncedAt` is called only **once, after the full** delivery loop
-  finishes (lines 24-30). The scheduler has a hard 4m30s limit (`worker.ts`,
-  outside this repo) and `SIGKILL`s the process if a run doesn't finish in time —
-  and because of the mass "catch-up" send of the backlog (accumulated from the two
-  ENOSPC failures) plus `postJson()` retries on Slack `429`, every run after 00:15
-  fails to finish in time. The SIGKILL happens **before** line 36, so
-  `lastSyncedAt` never advances — and every next run sees the same (and growing)
-  backlog again. This is a self-sustaining loop, which explains why the duplicates
-  kept going for ~9 hours after the disk was freed (the log shows
-  `scheduler: run exceeded 4m30s limit` repeating every 5 minutes up to `09:14:30`).
-  - Additionally (my own observation, not from the command's answer):
-    `sync/state.ts:14-17` (`loadState`) also has a risky silent fallback — any
-    `JSON.parse` error silently returns `INITIAL_STATE` (year 1970) with nothing
-    logged; for this specific incident it's not the main cause (the log shows no
-    evidence of file corruption — the processes either failed before writing or
-    died from SIGKILL), but it's the same class of defect, and refactoring this
-    file should remove the silent catch.
+- **Root cause (file:line, mechanism):** `app/src/sync/state.ts:13-17` — the
+  `catch` in `loadState()` silently falls back to `INITIAL_STATE` (epoch
+  `1970-01-01`) on **any** read/parse failure of `data/sync-state.json`, instead of
+  surfacing it as an error (which would violate `conventions.md`'s own rule that
+  external JSON goes through `parseJson()`+guard, not a silent default). The
+  decisive evidence is *which* lead the 00:15 resend restarts from: the log shows
+  delivery beginning at `ld_0001` — the very first lead in the dataset — not
+  somewhere near `ld_1284`, where the previous clean run (00:00, `0 pending`) had
+  left off. A "progress just didn't advance during one run" defect would resume
+  near `ld_1284`; resuming at `ld_0001` is only explained by a full state reset to
+  epoch, which is exactly what `loadState()`'s silent catch produces when it reads
+  a corrupted/truncated file.
+- **Mechanism:** `saveState()`'s `writeFileSync` (state.ts:20-22) is not atomic, so
+  the `ENOSPC` failures at `00:05`/`00:10` can leave `sync-state.json` truncated on
+  disk. Once the disk is freed and the `00:15` run starts, `loadState()` hits that
+  corrupted file, `JSON.parse` throws, and the catch returns epoch — so
+  `runSync`'s `pending` filter (`run.ts:20`, `lead.createdAt > state.lastSyncedAt`)
+  now matches every lead ever seen, triggering the mass resend starting at
+  `ld_0001`.
 - **Trigger vs. cause:** the command explicitly asked itself the control question
-  "if only the trigger (disk) were removed — would the incident recur?" → "yes,
-  because SIGKILL and backlog accumulation don't depend on the disk" → went deeper
-  into the code instead of stopping at ENOSPC.
-- **Amplifiers**, named separately from the cause: `postJson()` retries on `429`
-  (`core/http.ts`) during the mass send; the unconditional `saveState()` right
-  after `loadState()` at the start of `runSync` (`run.ts:18`), which is what failed
-  with ENOSPC first.
-- Reproducing test: proposed (fails on current code) — an integration that throws
-  on the second lead inside the loop, simulating SIGKILL; the next run resends both
-  leads even though the first was already delivered.
-- **Stop:** yes — 11 tool calls (Read/Bash), 0 Write/Edit; no code changed, waited
+  "if only the trigger (disk) were removed — would the incident recur?" → "yes" →
+  went deeper into the code instead of stopping at ENOSPC, and specifically
+  checked which of two competing explanations ("didn't advance" vs. "fully reset")
+  the log evidence actually supports before picking one.
+- **Amplifiers**, named separately from the cause: (a) the unconditional
+  `saveState()` right after `loadState()` at the start of `runSync` (`run.ts:18`)
+  re-persists the reset epoch state as "valid" JSON at the start of every run; (b)
+  processing 500+ leads with Slack `429` retries (`core/http.ts`) makes each run
+  exceed the scheduler's hard 4m30s limit, so the worker is `SIGKILL`ed before
+  reaching the state-advancing `saveState()` at `run.ts:36` — so `lastSyncedAt`
+  never moves past epoch and the identical full resend repeats every 5 minutes for
+  ~9 hours, long after the disk was freed.
+- Reproducing test: proposed (fails on current code, matches `run.test.ts`'s
+  style) — write a truncated/invalid `sync-state.json` before calling `runSync`,
+  then assert that not every lead gets resent; today it fails because
+  `loadState()` silently fabricates a valid epoch state instead of surfacing the
+  parse error.
+- **Stop:** yes — 9 tool calls (Read/Bash), 0 Write/Edit; no code changed, waited
   for confirmation before proposing a fix.
+- **Correction history:** an earlier run of this command (before step 4 — "which
+  record does the resend restart from?" — was added to
+  `.claude/commands/analyze-error.md`) concluded the root cause was
+  `run.ts:36`'s end-of-loop-only `saveState()`, treating `state.ts`'s silent
+  epoch-fallback as a secondary observation rather than the primary cause. That
+  was wrong: it explained why progress doesn't advance *within* one killed run,
+  but not why the very first resend restarted at `ld_0001` instead of near
+  `ld_1284`. The command was fixed to explicitly check the resend's starting point
+  against the log before concluding, and re-run — see above.
 
 ### `/refactor`
 
