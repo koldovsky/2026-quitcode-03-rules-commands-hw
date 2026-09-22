@@ -1,0 +1,43 @@
+# ПРОПОЗИЦІЯ, НЕ ЗАСТОСОВАНО. Нічого в репозиторії не змінено.
+#
+# Крок 1 — PR платформної команди (app/src/core/** — захищена зона).
+# Крок 2-3 — моя частина, компілюється тільки після кроку 1.
+
+--- a/app/src/core/types.ts        # КРОК 1: платформна команда
++++ b/app/src/core/types.ts
+@@ interface Lead
+   source: "website" | "instagram" | "referral";
+   budgetUsd?: number;
++  /** Рекламна кампанія з UTM-міток форми сайту, якщо була. */
++  utmCampaign?: string;
+   /** ISO-8601, UTC. */
+   createdAt: string;
+
+--- a/app/src/integrations/sheets-append.ts      # КРОК 2: моя частина
++++ b/app/src/integrations/sheets-append.ts
+@@ async send(lead: Lead)
+-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
++      values: [
++        [lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, lead.utmCampaign ?? ""],
++      ],
+
+--- a/app/src/integrations/sheets-append.test.ts  # КРОК 3: моя частина
++++ b/app/src/integrations/sheets-append.test.ts
+@@ успішна відправка: шоста колонка в кінці рядка
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [
++        ["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""],
++      ],
+@@ + новий тест
++  it("записує кампанію окремою колонкою в кінці рядка", async () => {
++    const fetchMock = vi.fn(async () => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send({ ...lead, utmCampaign: "spring_sale_2026" })).resolves.toEqual({
++      ok: true,
++      value: undefined,
++    });
++
++    const [, init] = fetchMock.mock.calls[0]!;
++    expect(JSON.parse(String(init?.body)).values[0][5]).toBe("spring_sale_2026");
++  });
