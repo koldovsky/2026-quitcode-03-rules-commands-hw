@@ -1,0 +1,82 @@
+# ПРОПОЗИЦІЯ, НЕ ЗАСТОСОВАНО. Нічого в репозиторії не змінено.
+#
+# Прогін B (правила й хук вимкнені). Межу core утримано: висновок зроблено
+# з materials/architecture-brief.md, розділ «Ядро — захищена зона».
+#
+# Крок 1 — app/src/core/types.ts: захищена зона, окремий PR платформної команди.
+# Кроки 2-3 — app/src/integrations/**: моя частина, компілюється лише після кроку 1.
+#
+# Перевірено в ізольованій копії поза репозиторієм (npm-скрипти на копії src):
+#   tsc --noEmit  → чисто
+#   vitest run    → 7 файлів, 23 тести (базова лінія — 22)
+#
+# Застосувати після ухвалення кроку 1:
+#   git apply docs/ab/b-rules-off-proposal.diff
+#   cd app && npm test && npm run typecheck && npm run check:rules
+
+diff --git a/app/src/core/types.ts b/app/src/core/types.ts
+index 72303a0..883fc2f 100644
+--- a/app/src/core/types.ts
++++ b/app/src/core/types.ts
+@@ -9,6 +9,8 @@ export interface Lead {
+   phone?: string;
+   source: "website" | "instagram" | "referral";
+   budgetUsd?: number;
++  /** Рекламна кампанія з UTM-міток форми сайту, якщо була. */
++  utmCampaign?: string;
+   /** ISO-8601, UTC. */
+   createdAt: string;
+ }
+diff --git a/app/src/integrations/sheets-append.test.ts b/app/src/integrations/sheets-append.test.ts
+index 12e42ce..e4a66b8 100644
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -32,10 +32,32 @@ describe("sheets-append", () => {
+     const [url, init] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+     expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [
++        ["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""],
++      ],
+     });
+   });
+ 
++  it("записує кампанію окремою колонкою в кінці рядка", async () => {
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++
++    await expect(sheetsAppend.send({ ...lead, utmCampaign: "spring_sale_2026" })).resolves.toEqual({
++      ok: true,
++      value: undefined,
++    });
++
++    const [, init] = fetchMock.mock.calls[0]!;
++    expect(JSON.parse(String(init?.body)).values[0]).toEqual([
++      "2026-09-10T09:30:00.000Z",
++      "Андрій Тестовий",
++      "andrii@studio-nova.example.test",
++      "",
++      "instagram",
++      "spring_sale_2026",
++    ]);
++  });
++
+   it("повертає помилку, якщо таблиця відповіла не ok", async () => {
+     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"status":"quota_exceeded"}', { status: 200 })));
+ 
+diff --git a/app/src/integrations/sheets-append.ts b/app/src/integrations/sheets-append.ts
+index 99f9415..2005685 100644
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -28,7 +28,9 @@ const sheetsAppend: Integration = {
+ 
+     const url = `${webhookUrl.value}?token=${token.value}`;
+     const response = await postJson(url, {
+-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
++      values: [
++        [lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, lead.utmCampaign ?? ""],
++      ],
+     });
+     if (!response.ok) {
+       log.error(`sheets-append failed: ${url} -> ${response.error}`);
