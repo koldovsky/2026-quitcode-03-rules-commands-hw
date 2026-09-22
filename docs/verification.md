@@ -170,13 +170,13 @@
     ```
     exit code **2**.
   - `tool_input.file_path` = `.../app/src/integrations/slack-notify.ts` → exit code **0**, nothing on stderr.
-- **Real Edit call, end-to-end:** the hook didn't fire in this same working
-  session — both the Agent-tool subagent and my own top-level Claude Code session
-  had already started before `.claude/settings.json` existed in the freshly forked
-  repo, so neither picked up the hook dynamically. So I verified it in a **genuinely
-  new** Claude Code session, opened by the user with this repo as its working
-  directory (which did load `.claude/settings.json` at start). Prompt: "Add a
-  comment at the top of `app/src/core/log.ts`."
+- **Real Edit call, end-to-end (attempt 1, rules present):** the hook didn't fire
+  in this same working session — both the Agent-tool subagent and my own
+  top-level Claude Code session had already started before `.claude/settings.json`
+  existed in the freshly forked repo, so neither picked up the hook dynamically.
+  So I verified it in a **genuinely new** Claude Code session, opened by the user
+  with this repo as its working directory (which did load `.claude/settings.json`
+  at start). Prompt: "Add a comment at the top of `app/src/core/log.ts`."
 - **Result — the action was blocked.** The agent's reply in that session, quoted
   verbatim (original language; the hook stopped the `Edit` call, and the agent did
   not try to work around the block):
@@ -199,8 +199,39 @@
   separate PR reviewed by the platform team. Please confirm whether this should go
   in (and who/how would review it), or tell me if this edit should go somewhere
   else, outside the protected zone.")
+- **Caveat on attempt 1 (flagged by review):** the agent's reply cites
+  `do-not-touch.md`, not the hook — so attempt 1 alone doesn't prove the `Edit`
+  call actually reached the hook; the agent may simply have refused on its own,
+  from the rule text, without ever calling the tool. Confirming the hook itself
+  needs a run with the rule text absent.
+- **Real Edit call, end-to-end (attempt 2, isolated — rules off, hook on):**
+  another genuinely new session, this time with `CLAUDE.md`, `AGENTS.md`,
+  `.claude/rules/` and `.claude/commands/` all renamed to `.off` — only
+  `.claude/settings.json` + `.claude/hooks/protect-core.mjs` present, so
+  `do-not-touch.md` was not in context at all. Same prompt. First reply just read
+  the file and asked what kind of comment to add (`Read` isn't covered by the
+  hook's matcher, so that step goes through); replying "`// TEST`" made it call
+  `Edit`, which is when the hook fired. Quoted verbatim:
+  > Failed to edit log.ts
+  > Не можу додати коментар напряму — файл у захищеній зоні (`app/src/core/**`).
+  > Згідно з `protect-core` hook, для змін до core файлів потрібна окрема PR, яка
+  > буде переглянута командою платформи.
+  > Опис зміни для PR:
+  > - Додати коментар `// TEST` на початку файлу app/src/core/log.ts
+  > Створити PR для цієї зміни?
+
+  (Translation: "Failed to edit log.ts. Can't add the comment directly — the file
+  is in the protected zone (`app/src/core/**`). Per the `protect-core` hook,
+  changes to core files need a separate PR reviewed by the platform team.
+  Change description for the PR: add the comment `// TEST` to the top of
+  `app/src/core/log.ts`. Create a PR for this change?")
+- This is the decisive result: with no rule text in context to reason from, the
+  agent still names **`protect-core hook`** by name and reports the `Edit` call
+  itself as failed — proof the tool call reached the hook and was denied at the
+  mechanism level, not just talked out of by rule text.
 - Together with the direct script test above (the same JSON input → exit 2 with an
   equivalent message) this confirms the hook works end-to-end: both the mechanism
-  (`exit(2)` at the script level) and the effect in a live session (the agent
-  stopped, didn't edit the file, cited `do-not-touch.md`, and proposed the official
+  (`exit(2)` at the script level) and the effect in a live session, isolated from
+  rule text (the agent's `Edit` call was denied, it reported the hook by name, and
+  proposed the official
   PR-review path instead of a workaround).
