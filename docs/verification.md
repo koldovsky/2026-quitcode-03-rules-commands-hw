@@ -3,13 +3,14 @@
 > Methodology note (applies to this whole document and to `docs/ab-validation.md`):
 > in this environment the standalone `claude` CLI isn't logged in (a separate
 > process, separate auth from the host), so a genuine "new session" via `claude -p`
-> wasn't possible. I also confirmed empirically that an agent spawned through the
-> Agent tool (a subagent) does **not** auto-load `CLAUDE.md`/`AGENTS.md`/
-> `.claude/rules/*.md` at start — unlike a real Claude Code session. So for the
-> checks below I give such a subagent an explicit bootstrap instruction, identical
-> across runs: "first read `CLAUDE.md`; if it has an `@file` import, load that too;
-> check `.claude/rules/` and `.claude/commands/`." This reproduces the loading
-> mechanism itself, not the desired result.
+> wasn't available to me directly. I also confirmed empirically that an agent
+> spawned through the Agent tool (a subagent) does **not** auto-load
+> `CLAUDE.md`/`AGENTS.md`/`.claude/rules/*.md` at start — unlike a real Claude Code
+> session. Where a check below is still based on such a subagent (with an explicit
+> bootstrap instruction standing in for real session boot), that's noted
+> explicitly. Wherever possible, the participant instead opened a genuinely new
+> Claude Code session by hand and ran the check there — that evidence supersedes
+> the subagent version and is the one that counts.
 >
 > Quoted agent replies below are kept verbatim as evidence, in whatever language the
 > agent actually replied in — translating a direct quote would misrepresent what
@@ -17,23 +18,55 @@
 
 ## Task B — does the tool actually see AGENTS.md
 
-- Tool and version: Claude Code (Agent SDK, subagent type `claude`).
-- How I checked: gave a fresh subagent an instruction to read only `CLAUDE.md`, and
-  if it contains an `@file` import, load that file too — then answer 3 questions
-  about the project **without opening any other files**.
-- Result (quote): "The `@AGENTS.md` import worked: after reading only `CLAUDE.md`,
-  its content appeared to me automatically via a system-reminder (not as a
-  markdown link I'd have had to choose to follow)." It then correctly named all 4
-  commands (`npm install/test/typecheck/check:rules`), the protected zone
-  (`app/src/core/**` + `app/scripts/**` + `materials/**`) and the stop procedure,
-  and two conventions (`Result`/core helpers; no `any`, no new dependencies) — all
-  of that only lives in `AGENTS.md`, not in `CLAUDE.md`. So the import genuinely
-  loads the content, not just the file name.
-- Control run (before fixing `CLAUDE.md`, when it still had
-  `[AGENTS.md](./AGENTS.md)`): a separate fresh subagent, asked directly "what
-  commands does this project use / which directory is protected" without opening
-  files, reported no `CLAUDE.md`/`AGENTS.md`/rule content in context at all — the
-  link by itself loads nothing.
+- Tool and version: Claude Code, genuinely new session opened by the participant
+  in this repo (not a subagent — see the correction below).
+- How I checked: in a fresh session, asked "List the project rules you currently
+  have in context, without opening any files."
+- **Result (quote, real new session):**
+  > Protected Zones (do-not-touch)
+  > - Do not edit, create, or delete under: `app/src/core/**`, `app/scripts/**`, `materials/**`, `.coderabbit.yaml`, `.github/**`
+  > - Applies to any task, no exceptions
+  >
+  > Code Conventions (from AGENTS.md)
+  > 1. Error handling: Use `Result` instead of exceptions
+  > 2. Utilities: Use `postJson`, `readEnv`, `parseJson`+guard, `log`
+  > 3. Type safety: No `any` types
+  > 4. Dependencies: No new runtime dependencies
+  > 5. Notifications: Slack messages must not include lead email or phone
+  > 6. File names: kebab-case; integration `name` field must match file name
+  >
+  > Architecture & Layers
+  > - Dependency direction and core's public API rules exist in `.claude/rules/architecture.md` (in context but details not shown)
+  >
+  > Project Structure
+  > - `app/src/core/` — shared platform core (protected)
+  > - `app/src/integrations/` — external system modules + registry
+  > - `app/src/sync/` — sync run and state management
+  >
+  > Before Committing
+  > ```
+  > cd app && npm test && npm run typecheck && npm run check:rules
+  > ```
+  >
+  > Note: The full details of `architecture.md` and `conventions.md` are
+  > referenced but not loaded in the current context.
+- **This is stronger evidence than "the import loads something" — it shows the
+  applies-to modes working exactly as designed:** `AGENTS.md` (loaded via
+  `@AGENTS.md`, always-on) and `do-not-touch.md` (no `paths`, always-on) are fully
+  in context from session start; `architecture.md`/`conventions.md` (`paths:
+  app/src/**/*.ts`) are known to exist (correctly summarized from AGENTS.md's own
+  one-line pointers) but their own file content is **not** loaded — because the
+  session hadn't touched any `app/src/**` file yet. That's the intended
+  path-scoped behavior, not a bug: a session that never touches `app/src/` never
+  pays the context cost of those two rule files.
+- **Correction:** an earlier version of this check used a subagent (Agent tool)
+  instructed to read `CLAUDE.md` and follow its `@AGENTS.md` import by hand. That
+  proved the import mechanism works (the subagent got `AGENTS.md`'s content
+  without opening it directly), but it does **not** prove that a real Claude Code
+  session auto-loads project memory at session start, since a subagent was told
+  what to do rather than booting on its own. The result above, from a genuinely
+  new session with zero instructions about what to check, replaces that as the
+  authoritative evidence for Task B.
 
 ## Task C — command runs
 
