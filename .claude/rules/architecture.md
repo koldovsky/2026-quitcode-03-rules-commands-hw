@@ -55,7 +55,7 @@ paths:
 
 ## Як перевірити
 
-- `cd app && node ./node_modules/.bin/vitest run` — зелений (18+ тестів).
+- `cd app && npm test` — зелений (18+ тестів).
 - `cd app && npm run check:rules` → `core-untouched 0`.
 - `grep -rn "from \"\.\./\(integrations\|sync\)" app/src/core/` — порожньо
   (ядро ні від кого не залежить).

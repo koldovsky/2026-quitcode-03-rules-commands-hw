@@ -35,9 +35,9 @@ argument-hint: <назва сервісу, напр. HubSpot, Pipedrive, Telegra
    масиву `integrations`.
 6. **Перевір**:
    ```bash
-   cd app && ./node_modules/.bin/vitest run
+   cd app && npm test
    cd app && npm run check:rules
-   cd app && ./node_modules/.bin/tsc --noEmit
+   cd app && npm run typecheck
    ```
 7. **Покажи підсумок**: створені файли, `name`, `requiredEnv`, числа з перевірок
    і окремим списком — усі припущення з кроку 2, які людині треба підтвердити.
@@ -45,7 +45,9 @@ argument-hint: <назва сервісу, напр. HubSpot, Pipedrive, Telegra
 ## Acceptance criteria
 
 - [ ] Рівно два нових файли + один змінений (`index.ts`): `git status --short`.
-- [ ] `./node_modules/.bin/vitest run` зелений; нових тестів — три.
+- [ ] `npm test` зелений; нових тестів — **щонайменше три** (успіх, відсутня
+      змінна середовища, помилка зовнішньої системи); більше — можна, якщо
+      модуль має ще одну гілку логіки.
 - [ ] `npm run check:rules` не показує нових порушень; `TOTAL` не зріс проти базової лінії.
 - [ ] `tsc --noEmit` без помилок; у новому коді немає `any`.
 - [ ] `name` збігається з іменем файлу; `requiredEnv` містить лише імена змінних,

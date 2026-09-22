@@ -16,9 +16,6 @@
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run check:rules` | статична перевірка конвенцій — базова лінія `TOTAL: 8` |
 
-> Якщо `npm test` падає з `vitest: command not found` — у шляху до репо є двокрапка,
-> яка ламає `PATH`. Обхід: `./node_modules/.bin/vitest run`.
-
 ## Карта коду
 
 | Тека | Що це |
