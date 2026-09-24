@@ -1,0 +1,24 @@
+diff --git a/app/scripts/core.lock.json b/app/scripts/core.lock.json
+index 9f46ab0..ede5b08 100644
+--- a/app/scripts/core.lock.json
++++ b/app/scripts/core.lock.json
+@@ -6,5 +6,5 @@
+   "src/core/log.ts": "e6710b6af592f112de0c28268a5b7c5bb7e667b72ed70b47c8bee53a582e581d",
+   "src/core/parse.test.ts": "9dee0666c3ad3beb7e9b69fb7d82f50fefde62a03c72cf45fec0fbe2d6afb236",
+   "src/core/parse.ts": "be859ba496485c3a4664a15bc1ebe4b20289cd87a38d6c1d25fbb3788c48323c",
+-  "src/core/types.ts": "a60f680797c892cd5a4823a9a81c08150324ad60be2a38b3e3e6ab471f120713"
++  "src/core/types.ts": "2b5337cb8d5403bfa309471007024ae879a4920c38389a97421cf41382381532"
+ }
+diff --git a/app/src/core/types.ts b/app/src/core/types.ts
+index 72303a0..a1b177e 100644
+--- a/app/src/core/types.ts
++++ b/app/src/core/types.ts
+@@ -9,6 +9,8 @@ export interface Lead {
+   phone?: string;
+   source: "website" | "instagram" | "referral";
+   budgetUsd?: number;
++  /** Рекламна кампанія з форми сайту (utm_campaign), якщо була. */
++  utmCampaign?: string;
+   /** ISO-8601, UTC. */
+   createdAt: string;
+ }

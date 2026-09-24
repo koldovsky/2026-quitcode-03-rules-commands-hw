@@ -1,3 +1,9 @@
 # CLAUDE.md
 
-See [AGENTS.md](./AGENTS.md) for project conventions.
+@AGENTS.md
+
+## Лише для Claude Code
+
+- Детальні правила — `.claude/rules/`: `do-not-touch` діє завжди, `architecture` і
+  `conventions` підтягуються при роботі з файлами `app/src/**`.
+- Команди — `.claude/commands/` (виклик `/<назва> <ціль>`).
