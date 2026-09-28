@@ -40,6 +40,7 @@ paths:
 
 - `cd app && npm run check:rules` — рядки `http-via-core`, `env-via-config`,
   `json-via-parse`, `log-via-logger`, `no-any`, `no-new-deps` не зростають для
-  зміненого файлу відносно значення до зміни (базова лінія — 8 порушень у
-  спадковому коді, зафіксована в README).
+  зміненого файлу відносно значення до зміни (поточна базова лінія — 1
+  порушення: `json-via-parse` у `src/sync/state.ts`; 8 у README — стан до
+  рефакторингу `sheets-append.ts`).
 - `cd app && npm test && npm run typecheck` — обидва зелені.

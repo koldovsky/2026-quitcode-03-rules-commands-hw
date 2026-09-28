@@ -37,8 +37,11 @@ paths:
 
 - `grep -rn "from \"\.\./core\|from \"\./core\|from \"\.\./\.\./core" app/src/integrations app/src/sync` —
   усі імпорти з `core/` використовують лише перелічені вище імена.
-- `grep -rln "sync" app/src/integrations` — порожній вивід: `integrations/**` не
-  посилається на `sync/**`.
+- `grep -rnE "from ['\"]\.\./sync" app/src/integrations` — порожній вивід:
+  `integrations/**` не імпортує з `sync/**` (шукаємо сам імпорт — підрядок
+  `sync` є в кожному `async`).
+- `grep -rnE "from ['\"]\.\./integrations/" app/src/sync | grep -v "integrations/index\.js"` —
+  порожній вивід: `sync/**` не звертається до модулів інтеграцій повз реєстр.
 - Для нової інтеграції: `git status --short app/src` показує рівно новий
   `<kebab-name>.ts`, новий `<kebab-name>.test.ts` і модифікований
   `integrations/index.ts` — нічого в `sync/**`.

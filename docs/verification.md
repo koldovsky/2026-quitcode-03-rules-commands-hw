@@ -1,24 +1,41 @@
-# Перевірка (Task B, C і бонус E)
+# Перевірка (Task B і C)
 
 > Скопіювали з `docs/templates/verification.md`. Сюди — лише те, що справді
 > сталося у сесії: цитати, числа, імена файлів.
 
 ## Task B — чи бачить інструмент AGENTS.md
 
-- Інструмент і версія: Claude Code (сесія в Claude Desktop, модель Sonnet 5)
+- Інструмент і версія: Claude Code 2.1.x (сесія в Claude Desktop, вкладка Code;
+  прогін «до» — модель Sonnet 5)
 - Як перевірив: у **новій** сесії, не відкриваючи файлів, попросив перелічити
   правила проєкту, які вже є в контексті ("List the project rules you already
-  have in your context, verbatim.")
+  have in your context, verbatim."); для прогону «після» — ще й `/context` →
+  Memory files у тій самій новій сесії.
 - Результат **до** виправлення `CLAUDE.md` (Task A): агент показав вміст
   `CLAUDE.md` (`See [AGENTS.md](./AGENTS.md) for project conventions.`) і
   `.claude/rules/do-not-touch.md`, і сам зазначив: *"Note: CLAUDE.md references
   AGENTS.md, but its contents weren't included in my system context above —
   I'd need to read it directly if you want its content."* — тобто markdown-лінк
   дійсно не підвантажує файл.
-- Результат **після** заміни на `@AGENTS.md`: <TODO — повторити той самий
-  запит у новій сесії й вставити, що саме агент тепер показує з `AGENTS.md`;
-  очікується повний текст `AGENTS.md` серед "verbatim" вмісту, без потреби
-  окремо його читати>
+- Результат **після** заміни на `@AGENTS.md` (нова сесія, 2026-09-28):
+  - `/context` → **Memory files: 1.6k токенів, 3 файли**:
+    ```
+    …/CLAUDE.md          121
+    …/AGENTS.md          912
+    …/do-not-touch.md    540
+    ```
+  - Той самий запит: агент дослівно навів три файли — `/CLAUDE.md` (з рядком
+    `@AGENTS.md`), `/AGENTS.md` (повний текст, уже з оновленими числами
+    «22 зелені тести» і «baseline — 1 порушення») і
+    `/.claude/rules/do-not-touch.md` — і сам зазначив: *"Note:
+    `.claude/rules/architecture.md` and `.claude/rules/conventions.md` are not
+    currently in my context — per CLAUDE.md, those only load when I'm actually
+    working with files under `app/src/**`."*
+  - Висновок: `@AGENTS.md` імпортує файл — `AGENTS.md` у контексті окремим
+    memory-файлом без потреби його читати (на відміну від markdown-лінка «до»).
+    `architecture` і `conventions` у стартовому контексті немає — вони мають
+    `paths` і підвантажуються лише при роботі з `app/src/**`, як і задумано;
+    `do-not-touch` без `paths` — завжди.
 
 ## Task C — прогони команд
 
@@ -90,8 +107,3 @@
 - Спостереження: агент сам застосував правило мінімізації даних коректно —
   визнав Harvest системою обліку (не месенджером) і свідомо передав повні
   контактні дані ліда, а не лише ім'я/джерело/бюджет, як для Slack.
-
-## Task E (бонус) — хук
-
-- Файли: <...>
-- Спроба змінити `app/src/core/...` → що відповів хук (цитата): <...>

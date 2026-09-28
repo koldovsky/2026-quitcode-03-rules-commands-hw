@@ -11,9 +11,9 @@ Google-таблицю. TypeScript, Node 22+, Vitest, нуль runtime-залеж
 
 ```bash
 npm install
-npm test             # Vitest, очікується 18 зелених тестів
+npm test             # Vitest, очікується 22 зелені тести
 npm run typecheck    # tsc --noEmit
-npm run check:rules  # статична перевірка правил; baseline — 8 порушень у спадковому коді
+npm run check:rules  # статична перевірка правил; baseline — 1 порушення (json-via-parse у src/sync/state.ts)
 ```
 
 ## Карта коду (`app/src/`)
