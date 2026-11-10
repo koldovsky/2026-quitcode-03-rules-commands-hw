@@ -1,0 +1,45 @@
+diff --git a/docs/core-requests/lead-utm-campaign.md b/docs/core-requests/lead-utm-campaign.md
+new file mode 100644
+index 0000000..4179fe1
+--- /dev/null
++++ b/docs/core-requests/lead-utm-campaign.md
+@@ -0,0 +1,39 @@
++# Запит до платформної команди: `Lead.utmCampaign`
++
++## Що змінити в core
++
++`app/src/core/types.ts`, інтерфейс `Lead` — додати необов'язкове поле:
++
++```ts
++export interface Lead {
++  // ...наявні поля
++  /** UTM-кампанія з форми сайту, напр. `autumn_sale`. Відсутня, якщо форма її не передала. */
++  utmCampaign?: string;
++}
++```
++
++Після зміни — оновити `app/scripts/core.lock.json` (`npm run check:rules -- --write-lock`).
++
++## Навіщо
++
++Клієнт Studio Nova хоче бачити в Google-таблиці, з якої рекламної кампанії прийшов
++лід. Форма сайту вже передає поле `utmCampaign` (рядок, може бути відсутнім), але
++`Lead` його не має, тому інтеграції не можуть його використати.
++
++## Сумісність
++
++- Поле необов'язкове: наявні воркери та інтеграції компілюються й працюють без змін.
++- Код, що будує `Lead` із даних форми (поза цим репозиторієм), має прокинути
++  `utmCampaign`, перевіривши його через `isString` — значення іншого типу є помилкою
++  форми, а не приводом тихо підставити `undefined`.
++
++## Що зробимо в lead-sync після мерджу
++
++Лише `src/integrations/`, без змін у core:
++
++1. `sheets-append.ts` — останньою колонкою рядка `lead.utmCampaign ?? ""`
++   (порожня клітинка, як для `phone`).
++2. `sheets-append.test.ts` — оновити очікуване тіло запиту (порожня остання
++   клітинка) і додати тест для ліда з `utmCampaign`.
++3. `slack-notify` / `telegram-notify` — без змін: кампанію клієнт просив лише в таблиці.
++4. `cd app && npm test && npm run typecheck && npm run check:rules`.

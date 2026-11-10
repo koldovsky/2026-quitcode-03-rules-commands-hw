@@ -1,0 +1,73 @@
+diff --git a/app/src/integrations/sheets-append.test.ts b/app/src/integrations/sheets-append.test.ts
+index 802fae2..b7f6887 100644
+--- a/app/src/integrations/sheets-append.test.ts
++++ b/app/src/integrations/sheets-append.test.ts
+@@ -32,7 +32,42 @@ describe("sheets-append", () => {
+     const [url, init] = fetchMock.mock.calls[0]!;
+     expect(url).toBe("https://sheets.example.test/append?token=fake-sheets-token-0000");
+     expect(JSON.parse(String(init?.body))).toEqual({
+-      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram"]],
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
++    });
++  });
++
++  it("записує кампанію з форми окремою колонкою в кінці рядка", async () => {
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++    const leadWithCampaign = { ...lead, utmCampaign: "autumn_sale_2026" };
++
++    await expect(sheetsAppend.send(leadWithCampaign)).resolves.toEqual({ ok: true, value: undefined });
++
++    const [, init] = fetchMock.mock.calls[0]!;
++    expect(JSON.parse(String(init?.body))).toEqual({
++      values: [
++        [
++          "2026-09-10T09:30:00.000Z",
++          "Андрій Тестовий",
++          "andrii@studio-nova.example.test",
++          "",
++          "instagram",
++          "autumn_sale_2026",
++        ],
++      ],
++    });
++  });
++
++  it("лишає колонку кампанії порожньою, якщо utmCampaign не рядок", async () => {
++    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"status":"ok"}', { status: 200 }));
++    vi.stubGlobal("fetch", fetchMock);
++    const leadWithBadCampaign = { ...lead, utmCampaign: 42 };
++
++    await sheetsAppend.send(leadWithBadCampaign);
++
++    const [, init] = fetchMock.mock.calls[0]!;
++    expect(JSON.parse(String(init?.body))).toEqual({
++      values: [["2026-09-10T09:30:00.000Z", "Андрій Тестовий", "andrii@studio-nova.example.test", "", "instagram", ""]],
+     });
+   });
+ 
+diff --git a/app/src/integrations/sheets-append.ts b/app/src/integrations/sheets-append.ts
+index adac3f5..c91c326 100644
+--- a/app/src/integrations/sheets-append.ts
++++ b/app/src/integrations/sheets-append.ts
+@@ -11,6 +11,11 @@ interface SheetsResponse {
+ 
+ const isSheetsResponse = (value: unknown): value is SheetsResponse => isRecord(value) && isString(value.status);
+ 
++// Форма сайту передає рекламну кампанію як utmCampaign (може бути відсутнім). У core-типі Lead
++// цього поля немає (src/core захищено), тому читаємо його з guard: не рядок — порожня клітинка.
++const campaignOf = (lead: Lead): string =>
++  "utmCampaign" in lead && isString(lead.utmCampaign) ? lead.utmCampaign : "";
++
+ const sheetsAppend: Integration = {
+   name: "sheets-append",
+   requiredEnv: ["SHEETS_WEBHOOK_URL", "SHEETS_TOKEN"],
+@@ -22,7 +27,7 @@ const sheetsAppend: Integration = {
+     if (!token.ok) return token;
+ 
+     const response = await postJson(webhookUrl.value + "?token=" + token.value, {
+-      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source]],
++      values: [[lead.createdAt, lead.name, lead.email, lead.phone ?? "", lead.source, campaignOf(lead)]],
+     });
+     if (!response.ok) {
+       // Помилка postJson містить URL із токеном у query string — маскуємо перед поверненням.
