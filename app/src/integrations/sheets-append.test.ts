@@ -41,4 +41,39 @@ describe("sheets-append", () => {
 
     await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: false, error: "sheets error: quota_exceeded" });
   });
+
+  describe("помилки", () => {
+    beforeEach(() => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    it("повертає помилку без запиту, якщо немає змінної середовища", async () => {
+      vi.stubEnv("SHEETS_TOKEN", "");
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(sheetsAppend.send(lead)).resolves.toEqual({
+        ok: false,
+        error: "missing environment variable SHEETS_TOKEN",
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("повертає помилку HTTP без токена в тексті", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("forbidden", { status: 403 })));
+
+      const result = await sheetsAppend.send(lead);
+
+      expect(result).toEqual({
+        ok: false,
+        error: "POST https://sheets.example.test/append?token=<REDACTED> failed: HTTP 403",
+      });
+    });
+
+    it("повертає помилку, якщо відповідь не JSON очікуваної форми", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("<!DOCTYPE html>", { status: 200 })));
+
+      await expect(sheetsAppend.send(lead)).resolves.toEqual({ ok: false, error: "sheets-append: invalid JSON" });
+    });
+  });
 });
